@@ -1,21 +1,23 @@
 (defsystem :analysis
   :depends-on (
+               ;; base lang tools
                :qlot
+               :coalton ; coalton-lang/coalton
+               ;; for coalton fset+me must be current from repo
+               :fset ; slburson/fset/
+               :misc-extensions ; slburson/misc-extensions/
                :alexandria
-               :serapeum
-               :fset
-               :misc-extensions ;; fset helper
                :access
                :arrow-macros
-               :lparallel
 
+               ;; analysis tools
                :lisp-stat
                :cl-csv
                :cl-str
-               ;; :cl-gdal ;jl2/cl-gdal
                :filepaths ; ultralisp foskers-filepaths
                :filesystem-utils
                :py4cl2
+               ;; :cl-gdal ;jl2/cl-gdal
                )
   :serial t
   :components ((:file "analysis") ; a .lisp file

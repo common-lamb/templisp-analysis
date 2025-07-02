@@ -1,11 +1,13 @@
 
 ;;;; ===================================  set environment
-                                        ; imports
+
+;;                                         ; imports
 (ql:quickload :qlot)
-(ql:quickload :alexandria)
-(ql:quickload :serapeum)
+(ql:quickload :coalton)
 (ql:quickload :fset)
 (ql:quickload :misc-extensions)
+(ql:quickload :alexandria)
+(ql:quickload :serapeum)
 (ql:quickload :access)
 (ql:quickload :arrow-macros)
 (ql:quickload :lparallel)
@@ -15,20 +17,20 @@
 (ql:quickload :filepaths); ultralisp foskers-filepaths
 (ql:quickload :filesystem-utils)
 (ql:quickload :py4cl2)
-;; (ql:quickload :click)
-;;(ql:quickload :cl-gdal);jl2/cl-gdal
-
 
 (defpackage :analysis
-  (:use
-   :cl
-   :py4cl2
-   ))
+  (:use :cl)
+  (:local-nicknames (:py :py4cl2 ))
+  (:local-nicknames (:col :coalton))
+  (:local-nicknames (:csv :cl-csv))
+  (:local-nicknames (:acc :access))
+  (:import-from :arrow-macros :-<> :<>)
+  )
 
                                         ; enter package
 (in-package :analysis) ; Also enter this in the REPL!
 
-(initialize)
+(py:initialize)
 (pyversion-info)    ; fails if python command is not resolved in system
 (defpymodule "sys" nil :lisp-package "SYS")
 (defpymodule "pprint" nil :lisp-package "PPRINT")

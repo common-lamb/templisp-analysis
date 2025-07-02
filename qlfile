@@ -1,11 +1,11 @@
+
 ql qlot
+github coalton-lang/coalton
+github slburson/fset
+github slburson/misc-extensions
 ql alexandria
-ql serapeum
-ql fset
-ql misc-extensions
 ql access
 ql arrow-macros
-ql lparallel
 ql lisp-stat
 ql cl-csv
 ql cl-str

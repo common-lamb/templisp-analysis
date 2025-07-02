@@ -6,22 +6,22 @@
  (:class qlot/source/ql:source-ql
   :initargs (:%version :latest)
   :version "ql-2025-06-22"))
+("coalton" .
+ (:class qlot/source/github:source-github
+  :initargs (:repos "coalton-lang/coalton" :ref nil :branch nil :tag nil)
+  :version "github-9adf06b9801ff02405c402ab17bf6bcd22aa33bc"))
+("fset" .
+ (:class qlot/source/github:source-github
+  :initargs (:repos "slburson/fset" :ref nil :branch nil :tag nil)
+  :version "github-d61ddbb9b7d14af259980b8b9ffbfd07d9b10429"))
+("misc-extensions" .
+ (:class qlot/source/github:source-github
+  :initargs (:repos "slburson/misc-extensions" :ref nil :branch nil :tag nil)
+  :version "github-1f70028cfd3b2d286d5311d64c41ae384fa15525"))
 ("alexandria" .
  (:class qlot/source/ql:source-ql
   :initargs (:%version :latest)
   :version "ql-2024-10-12"))
-("serapeum" .
- (:class qlot/source/ql:source-ql
-  :initargs (:%version :latest)
-  :version "ql-2025-06-22"))
-("fset" .
- (:class qlot/source/ql:source-ql
-  :initargs (:%version :latest)
-  :version "ql-2025-06-22"))
-("misc-extensions" .
- (:class qlot/source/ql:source-ql
-  :initargs (:%version :latest)
-  :version "ql-2025-06-22"))
 ("access" .
  (:class qlot/source/ql:source-ql
   :initargs (:%version :latest)
@@ -30,10 +30,6 @@
  (:class qlot/source/ql:source-ql
   :initargs (:%version :latest)
   :version "ql-2024-10-12"))
-("lparallel" .
- (:class qlot/source/ql:source-ql
-  :initargs (:%version :latest)
-  :version "ql-2016-08-25"))
 ("lisp-stat" .
  (:class qlot/source/ql:source-ql
   :initargs (:%version :latest)
@@ -49,7 +45,7 @@
 ("fosskers-filepaths" .
  (:class qlot/source/ultralisp:source-ultralisp
   :initargs (:%version :latest)
-  :version "ultralisp-20250630180000"))
+  :version "ultralisp-20250702134500"))
 ("filesystem-utils" .
  (:class qlot/source/ql:source-ql
   :initargs (:%version :latest)
