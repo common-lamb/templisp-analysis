@@ -17,7 +17,6 @@
                :filepaths ; ultralisp foskers-filepaths
                :filesystem-utils
                :py4cl2
-               ;; :cl-gdal ;jl2/cl-gdal
                )
   :serial t
   :components ((:file "analysis") ; a .lisp file

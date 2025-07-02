@@ -1,3 +1,7 @@
+;;;; =================================== setup
+
+;; spc spc conda-env-activate analysis ;get conda env
+;; ,' ;attach repl
 
 ;;;; ===================================  set environment
 
@@ -18,36 +22,31 @@
 (ql:quickload :filesystem-utils)
 (ql:quickload :py4cl2)
 
+
 (defpackage :analysis
   (:use :cl)
+  ;;(:local-nicknames (:py :py4cl ))
   (:local-nicknames (:py :py4cl2 ))
   (:local-nicknames (:col :coalton))
   (:local-nicknames (:csv :cl-csv))
   (:local-nicknames (:acc :access))
-  (:import-from :arrow-macros :-<> :<>)
-  )
+  (:import-from :arrow-macros :-<> :<>))
 
                                         ; enter package
 (in-package :analysis) ; Also enter this in the REPL!
 
-(py:initialize)
-(pyversion-info)    ; fails if python command is not resolved in system
-(defpymodule "sys" nil :lisp-package "SYS")
-(defpymodule "pprint" nil :lisp-package "PPRINT")
-(pyexec "sys.path.append('/home/holdens/miniconda3/envs/analysis/lib/python3.13/site-packages')")
-(pyexec "pprint.pprint(sys.path)")
-;; check file is on path
-(defpymodule "os" nil :lisp-package "OS")
-(os:getcwd)
-(os:listdir)
+;; (py:initialize)
+;; (print py4cl2:*config*) ;; this triggers the company auto complete hang on lab linux
+;; (setf (config-var pycmd) "python3") ; set one field
 
-(defpymodule "pip" nil :lisp-package "PIP") ; worked
-(defpymodule "attr" nil :lisp-package "ATTR") ; worked
-(defpymodule "joblib" nil :lisp-package "JL") ; worked
+                                        ; ensure version and sys.path is same as python in cli
+(py:pyversion-info)    ; fails if python command is not resolved in system
+;; (py:defpymodule "sys" nil :lisp-package "SYS")
+;; (py:defpymodule "pprint" nil :lisp-package "PPRINT")
+;; (py:pyexec "pprint.pprint(sys.path)")
 
-(defpymodule "sklearn" nil :lisp-package "SKLEARN")
-(defpymodule "scipy" nil :lisp-package "SCIPY")
-(defpymodule "osgeo" nil :lisp-package "OSGEO")
-(defpymodule "rasterio" nil :lisp-package "RASTERIO")
-
-(defpymodule "" nil :lisp-package "")
+                                        ; python imports
+(py:defpymodule "sklearn" nil :lisp-package "SKLEARN")
+(py:defpymodule "scipy" nil :lisp-package "SCIPY")
+(py:defpymodule "osgeo" nil :lisp-package "OSGEO")
+(py:defpymodule "rasterio" nil :lisp-package "RASTERIO")
