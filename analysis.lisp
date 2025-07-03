@@ -87,27 +87,9 @@
 ;;;; method actions
 (py:pymethod *dataset* 'get_nodatavals) ; works
 ;; get first band
-;;(py4cl2:python-call "lambda ds: ds.read(1)" *dataset*)
-;; (py:pymethod *dataset* "read" 1) ; WARN heap exhausted
+;; pythonic: dataset.read(1)
+;; (py:pymethod *dataset* "read" 1) ;WARN heap exhausted
+(defparameter *read1* (py:pymethod *dataset* "read" 1)) ; works maybe because no print
 
-
-
-#|
-
-
-3. You can then use the dataset object to perform operations. For example:
-
-```lisp
-
-;; Read the first band of the raster
-```
-
-Remember to close the dataset when you're done:
-
-```lisp
-(py4cl2:python-call "lambda ds: ds.close()" *dataset*)
-```
-
-This approach should work around the "No generic type" error you're encountering, as it uses py4cl2's python-call function to directly invoke Python methods.
-
-|#
+;; close when done
+;; (py:pymethod *dataset* 'close) ; not tested
