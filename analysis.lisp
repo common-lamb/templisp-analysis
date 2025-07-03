@@ -45,8 +45,16 @@
 ;; (py:defpymodule "pprint" nil :lisp-package "PPRINT")
 ;; (py:pyexec "pprint.pprint(sys.path)")
 
+(py:pystop)
+(py:python-alive-p)
+(py:pystart)
                                         ; python imports
+(py:defpymodule "rasterio" t :lisp-package "RASTERIO") ; drivers: GTiff GPKG
+(py:defpymodule "geopandas" nil :lisp-package "GEOPANDAS")
 (py:defpymodule "sklearn" nil :lisp-package "SKLEARN")
-(py:defpymodule "scipy" nil :lisp-package "SCIPY")
-(py:defpymodule "osgeo" nil :lisp-package "OSGEO")
-(py:defpymodule "rasterio" nil :lisp-package "RASTERIO")
+
+
+(defparameter *gtif-true* #P"/home/holdens/db/1/masters/products/predictions1percent/height.tiff")
+
+(defparameter *dataset* (rasterio:open :fp (namestring *gtif-true*)))
+(print *dataset*)
