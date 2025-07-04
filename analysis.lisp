@@ -1,7 +1,7 @@
 ;;;; =================================== setup
 
 ;; spc spc conda-env-activate analysis ;get conda env
-;; ,' ;attach repl
+;; M--,' ;attach repl, using big heap
 
 ;;;; ===================================  set environment
 
@@ -22,7 +22,6 @@
 (ql:quickload :filesystem-utils)
 (ql:quickload :py4cl2)
 
-
 (defpackage :analysis
   (:use :cl)
   ;;(:local-nicknames (:py :py4cl ))
@@ -35,9 +34,15 @@
                                         ; enter package
 (in-package :analysis) ; Also enter this in the REPL!
 
+;; set printer to limit depth of large objects
+(setf *print-level* 100)
+(setf *print-length* 50)
+
 ; set config
 ;; (py:initialize)
-;; (print py4cl2:*config*) ;; this triggers the company auto complete hang on lab linux
+;; (print py4cl2:*config*) ;; WARN: this triggers the company auto complete hang on lab linux
+;; py4cl2:*config* ;; WARN: this triggers the company auto complete hang on lab linux
+
 ;; (setf (config-var pycmd) "python3") ; set one field
 
                                         ; ensure version and sys.path is same as python in cli
@@ -47,19 +52,18 @@
 ;; (py:pyexec "pprint.pprint(sys.path)")
 
                                         ; py process hard reset
-(py:pystop)
-(py:python-alive-p)
-(py:pystart)
+;; (py:pystop)
+;; (py:python-alive-p)
+;; (py:pystart)
                                         ; python imports
 (py:defpymodule "rasterio" t :lisp-package "RASTERIO") ; drivers: GTiff GPKG
-(py:defpymodule "geopandas" nil :lisp-package "GEOPANDAS")
-(py:defpymodule "sklearn" nil :lisp-package "SKLEARN")
-
+;; (py:defpymodule "geopandas" nil :lisp-package "GEOPANDAS")
+;; (py:defpymodule "sklearn" nil :lisp-package "SKLEARN")
 
 ; open the file
-(defparameter *gtif-true* #P"/home/holdens/db/1/masters/products/predictions1percent/height.tiff")
+(defparameter *gtif-true* #P"/home/holdens/tempdata/predictions1percent/height.tiff")
 
-;;py to cl: dataset = rasterio.open('some.tif')
+;; pythonic: dataset = rasterio.open('some.tif')
 (defparameter *dataset* (rasterio:open :fp (namestring *gtif-true*)))
 (print *dataset*)
 (py:pyslot-list *dataset* ) ; ie. show me what data it has
@@ -77,19 +81,63 @@
 (py:pyslot-value *dataset* 'dtypes)
 ;; dataset.crs
 (py:pyslot-value *dataset* 'crs)
-;; dataset.nodata
-(py:pyslot-value *dataset* 'nodata)
 ;; dataset.shape
 (py:pyslot-value *dataset* 'shape)
 ;; dataset-bounds
 (py:pyslot-value *dataset* 'bounds)
 
 ;;;; method actions
+;; get nodata value
 (py:pymethod *dataset* 'get_nodatavals) ; works
+
 ;; get first band
 ;; pythonic: dataset.read(1)
-;; (py:pymethod *dataset* "read" 1) ;WARN heap exhausted
-(defparameter *read1* (py:pymethod *dataset* "read" 1)) ; works maybe because no print
+(py:pymethod *dataset* "read" 1)
+;; pythonic: read1 = dataset.read(1)
+(defparameter *read1* (py:pymethod *dataset* "read" 1))
+;; close method when done &&&
+;; (py:pymethod *dataset* 'close)
 
-;; close when done
-;; (py:pymethod *dataset* 'close) ; not tested
+;;;; simple array operations
+(make-array '(2 2))
+(make-array '(2 2) :initial-element nil)
+(make-array '(2 2) :initial-contents '((1 2) (3 4)))
+
+(defparameter *test-array* (make-array '(2 2) :initial-element 4))
+(defparameter *test-tens* (make-array '(2 2 2) :initial-element 8))
+(describe *test-array*)
+(type-of *test-array*)
+
+(array-dimensions *test-array*)
+(aref *test-array* 0 1)
+(aref *test-tens* 0 0 0)
+*test-array*
+
+(type-of *read1*) ;; => (SIMPLE-ARRAY SINGLE-FLOAT (1000 26500))
+(array-dimensions *read1*) ;; => (1000 26500)
+(array-total-size *read1*) ;; => 26500000 (25 bits, #x1945BA0, #o145055640, #b1100101000101101110100000)
+(inspect *read1*) ;; works
+(describe *read1*) ;; works
+
+
+
+
+;;;; validate file name properties
+;;;; provide file name parts
+;;;; multiplex file-name-parts, stats calls into experimental runs
+
+;;;; open gtiff file with py4cl2 rasterio
+;;;; geotiff to array
+
+;;;; open gpkg file with geopandas
+;;;; rasterize identities gpkg with rasterio.features.rasterize
+;;;; gpkg to array
+
+;;;; validate file set properties match
+;;;; validate array properties coincidence
+
+;;;; convert arrays to magicl matrix
+;;;; manipulate arrays with magicl
+
+;;;; convert target matrix layers to lisp-stat
+;;;; plots and stats
