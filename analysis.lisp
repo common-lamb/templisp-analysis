@@ -122,22 +122,59 @@
 
 
 
-;;;; validate file name properties
-;;;; provide file name parts
-;;;; multiplex file-name-parts, stats calls into experimental runs
+;;;; run-all-reports
+;;;; multiplex file-name-parts/stats-calls into experimental runs
+;;;; validate all filename file properties
+;;;; validate all filename statscalls allowableness
+;;;; validate file set geospatial properties match
+;;;; call run-report for each
 
-;;;; open gtiff file with py4cl2 rasterio
-;;;; geotiff to array
+;;;; run-report
+;;;; call create matrix
+;;;; call mx-manipulations
+;;;; call mx->lstat
+;;;; call make-plots
+;;;; call stat-tests
+;;;; call compose-report
 
+;;;; create matrix
+;;;; call gpkg->array
+;;;; call gtif->array
+;;;; call array->mx
+;;;; call validate matrix
+
+;;;; gpkg->array
 ;;;; open gpkg file with geopandas
 ;;;; rasterize identities gpkg with rasterio.features.rasterize
-;;;; gpkg to array
 
-;;;; validate file set properties match
-;;;; validate array properties coincidence
+;;;; gtif->array
+;;;; open gtiff file with py4cl2 rasterio
 
+;;;; array->mx
 ;;;; convert arrays to magicl matrix
-;;;; manipulate arrays with magicl
 
+;;;; validate-matrix
+;;;; check expected properties
+;;;; overlap etc
+
+;;;; mx-manipulations (with magicl)
+;;;; select matrix manipulations
+;;;; abs diff, diff, masks, id masks &&&
+
+;;;; mx->lstat
+;;;; select matrix layers
 ;;;; convert target matrix layers to lisp-stat
-;;;; plots and stats
+
+;;;; make-plots
+;;;; select plots
+;;;; histos, bars, trends &&&
+
+;;;; stat-tests
+;;;; select stats calls
+;;;; &&&
+
+;;;; compose-report
+;;;; save plots to disk
+;;;; format stat-test text
+;;;; save report to disk
+;;;; optional display in buffer
