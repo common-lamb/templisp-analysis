@@ -1,9 +1,12 @@
-;;;; =================================== setup
+;;;; ==================================== setup environment
 
-;; spc spc conda-env-activate analysis ;get conda env
-;; M--,' ;attach repl, using big heap
+;; get conda env
+;; spc spc conda-env-activate "analysis"
 
-;;;; ===================================  set environment
+;; attach repl
+;; M-- ,' "qlot-8G-heap"
+
+;;;; ==================================== create package
 
 ;;                                         ; imports
 (ql:quickload :qlot)
@@ -32,18 +35,88 @@
   (:import-from :arrow-macros :-<> :<>))
 
                                         ; enter package
-(in-package :analysis) ; Also enter this in the REPL!
+(in-package :analysis)
 
+;;;; ==================================== package setup
 ;; set printer to limit depth of large objects
 (setf *print-level* 100)
 (setf *print-length* 50)
 
-; set config
+;;;; ==================================== Globals
+
+;;;; ==================================== X
+
+;;;; run-all-reports
+;;;; multiplex file-name-parts/stats-calls into experimental runs
+;;;; validate all filename file properties
+;;;; validate all filename statscalls allowableness
+;;;; validate file set geospatial properties match
+;;;; call run-report for each
+
+;;;; run-report
+;;;; call create matrix
+;;;; call mx-manipulations
+;;;; call mx->lstat
+;;;; call make-plots
+;;;; call stat-tests
+;;;; call compose-report
+
+;;;; create matrix
+;;;; call gpkg->array
+;;;; call gtif->array
+;;;; call array->mx
+;;;; call validate matrix
+
+;;;; gpkg->array
+;;;; open gpkg file with geopandas
+;;;; rasterize identities gpkg with rasterio.features.rasterize
+
+;;;; gtif->array
+;;;; open gtiff file with py4cl2 rasterio
+
+;;;; array->mx
+;;;; convert arrays to magicl matrix
+
+;;;; validate-matrix
+;;;; check expected properties
+;;;; overlap etc
+
+;;;; mx-manipulations (with magicl)
+;;;; select matrix manipulations
+;;;; abs diff, diff, masks, id masks &&&
+
+;;;; mx->lstat
+;;;; select matrix layers
+;;;; convert target matrix layers to lisp-stat
+
+;;;; make-plots
+;;;; select plots
+;;;; histos, bars, trends &&&
+
+;;;; stat-tests
+;;;; select stats calls
+;;;; &&&
+
+;;;; compose-report
+;;;; save plots to disk
+;;;; format stat-test text
+;;;; save report to disk
+;;;; optional display in buffer
+
+
+;;;; ==================================== FIN
+
+                                        ; X
+;;;; ==================================== X
+;;; ===================================== X
+;; ====================================== X
+
+                                        ; set config
 ;; (py:initialize)
 ;; (print py4cl2:*config*) ;; WARN: this triggers the company auto complete hang on lab linux
 ;; py4cl2:*config* ;; WARN: this triggers the company auto complete hang on lab linux
 
-;; (setf (config-var pycmd) "python3") ; set one field
+;; (setf (config-var pycmd) python3") ; set one field
 
                                         ; ensure version and sys.path is same as python in cli
 (py:pyversion-info)    ; fails if python command is not resolved in system
@@ -60,7 +133,7 @@
 ;; (py:defpymodule "geopandas" nil :lisp-package "GEOPANDAS")
 ;; (py:defpymodule "sklearn" nil :lisp-package "SKLEARN")
 
-; open the file
+                                        ; open the file
 (defparameter *gtif-true* #P"/home/holdens/tempdata/predictions1percent/height.tiff")
 
 ;; pythonic: dataset = rasterio.open('some.tif')
@@ -119,62 +192,4 @@
 (inspect *read1*) ;; works
 (describe *read1*) ;; works
 
-
-
-
-;;;; run-all-reports
-;;;; multiplex file-name-parts/stats-calls into experimental runs
-;;;; validate all filename file properties
-;;;; validate all filename statscalls allowableness
-;;;; validate file set geospatial properties match
-;;;; call run-report for each
-
-;;;; run-report
-;;;; call create matrix
-;;;; call mx-manipulations
-;;;; call mx->lstat
-;;;; call make-plots
-;;;; call stat-tests
-;;;; call compose-report
-
-;;;; create matrix
-;;;; call gpkg->array
-;;;; call gtif->array
-;;;; call array->mx
-;;;; call validate matrix
-
-;;;; gpkg->array
-;;;; open gpkg file with geopandas
-;;;; rasterize identities gpkg with rasterio.features.rasterize
-
-;;;; gtif->array
-;;;; open gtiff file with py4cl2 rasterio
-
-;;;; array->mx
-;;;; convert arrays to magicl matrix
-
-;;;; validate-matrix
-;;;; check expected properties
-;;;; overlap etc
-
-;;;; mx-manipulations (with magicl)
-;;;; select matrix manipulations
-;;;; abs diff, diff, masks, id masks &&&
-
-;;;; mx->lstat
-;;;; select matrix layers
-;;;; convert target matrix layers to lisp-stat
-
-;;;; make-plots
-;;;; select plots
-;;;; histos, bars, trends &&&
-
-;;;; stat-tests
-;;;; select stats calls
-;;;; &&&
-
-;;;; compose-report
-;;;; save plots to disk
-;;;; format stat-test text
-;;;; save report to disk
-;;;; optional display in buffer
+;;;; ===================================_X
