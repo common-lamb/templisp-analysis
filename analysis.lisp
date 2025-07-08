@@ -119,21 +119,21 @@
   "List of strings naming models which are to be compared")
 (defparameter *traits-reg* '(
                              "HEIGHT-CM"
-                             ;; "AREA"
-                             ;; "DENSITY"
-                             ;; "DIAMETER"
-                             ;; "SBLOTCH-LMH"
-                             ;; "SBLOTCH-RATING"
-                             ;; "STEM-WEIGHT"
-                             ;; "WEIGHT"
+                             "AREA"
+                             "DENSITY"
+                             "DIAMETER"
+                             "SBLOTCH-LMH"
+                             "SBLOTCH-RATING"
+                             "STEM-WEIGHT"
+                             "WEIGHT"
                              )
   "List of strings of traits for which the prediction objective was 'regression'")
 (defparameter *traits-cat* '(
                              "BARLEY-WHEAT"
-                             ;; "HULLED"
-                             ;; "ROWS"
-                             ;; "SBLOTCH-LMH"
-                             ;; "SBLOTCH-RATING"
+                             "HULLED"
+                             "ROWS"
+                             "SBLOTCH-LMH"
+                             "SBLOTCH-RATING"
                              )
   "List of strings of traits for which the prediction objective was 'multiclass'")
 
@@ -244,13 +244,15 @@
         (format t "~&~S~%" exp)))
     experiments))
 
+'((:TRAIT ("HEIGHT-CM") :OBJECTIVE ("regression") :MODELS ("TSAI" "GBM")) (:TRAIT ("BARLEY-WHEAT") :OBJECTIVE ("multiclass") :MODELS ("TSAI" "GBM")))
+
 (defun experiment-dictionary (filename-parts &optional (show nil))
   "Completes the dictionary of experiment definitions"
   (let ((completed-experiments '()))
     (dolist (experiment filename-parts)
       (let* ((objective (first (getf experiment :objective)))
              (models (getf experiment :models))
-             (tests (cond
+             (selected-tests (cond
                       ((string= objective "regression")
                        (append *stats-reg-describe-true*
                                *stats-reg-describe-pred*
@@ -264,22 +266,18 @@
                                (when (>= (length models) 2)
                                  *stats-cat-compare-models*)))
                       (t (error "Unknown objective: ~A" objective))))
-             (completed-experiment (copy-list experiment)))
-        (setf (getf completed-experiment :tests) tests)
-        (push completed-experiment completed-experiments)))
-
+             (experiment-plist (copy-list experiment))
+             (test-plist (list :tests selected-tests)))
+        (push (append experiment-plist test-plist) completed-experiments)))
     (setf completed-experiments (nreverse completed-experiments))
-
     (when show
-      (dolist (exp completed-experiments)
-        (format t "~&~S~%" exp)))
-
+      (dolist (i completed-experiments)
+        (format t "~&~S~%" i)))
     completed-experiments))
-
 
 ;;;; ==================================== API
 
-(run-all-reports :show t)
+(run-all-reports)
 
 ;;;; ==================================== FIN
 
