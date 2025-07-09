@@ -47,11 +47,11 @@
 ;; global variables
 
 ;;;; run-all-reports
-;;;; multiplex file-name-parts/stats-calls into experimental runs
+;;;; multiplex file-name-parts/stats-calls into experimental run dictionaries
 ;;;; validate all filename file properties
 ;;;; validate all filename statscalls allowableness
 ;;;; validate file set geospatial properties match
-;;;; call run-report for each
+;;;; call run-report for each experiment
 
 ;;;; run-report
 ;;;; call create matrix
@@ -106,17 +106,31 @@
 ;;;; ==================================== global variables
 
                                         ; file locations
-(defparameter *input-root* #P"/home/holdens/tempdata/predictions1percent/"
-              "Pathname to a dir containing tiff files. With naming format:<TRAIT>.tiff OR PREDICTED_<TRAIT>_<objective>_<MODEL>.tiff")
+(defparameter *program-root* #P"/home/holdens/tempdata/predictions1percent/"
+              "Pathname to a dir containing the dirs specified below" )
+
+(defparameter *tiffs-path* (filepaths:join *program-root* "tiffs")
+  "string of the dir in the input-root containing all tiff files. mandatory naming format:<TRAIT>.tiff OR PREDICTED_<TRAIT>_<objective>_<MODEL>.tiff")
+
+(defparameter *gpkgs-path* (filepaths:join *program-root* "gpkgs"))
+
+(defparameter *tables-path* (filepaths:join *program-root* "tables"))
+
+(defparameter *area-geopackage* (filepaths:join *gpkgs-path* "temp-area.gpkg"))
+
+(defparameter *identities-csv* (filepaths:join *tables-path* "temp-table.csv"))
 ;; &&& other input files and subdirs
 
-(defparameter *output-root* #P"/home/holdens/tempdata/OPanalysis/")
+(defparameter *geotiff-extension* "tiff"
+  "file extension used for the geotiff files. one of \"tif\" or \"tiff\" (no dot) ")
+
+(defparameter *output-root* (filepaths:join *program-root*  "output"))
 ;; &&& output subdirs
 
                                         ; input tif filename components
 (defparameter *models* '(
-                         "TSAI"
                          "GBM"
+                         "TSAI"
                          )
   "List of strings naming models which are to be compared")
 (defparameter *traits-reg* '(
@@ -252,10 +266,9 @@
       (format t "~&~%In: validate-globals"))
   ;; check models
   (let ((len-mod (length *models*)))
-    (assert (or (= 1 len-mod)
-                (= 2 len-mod))
+    (assert (= 2 len-mod)
         ()
-        "The number of models in *models* must be 1 or 2. Found: ~A" len-mod))
+        "The number of models in *models* must be 2. Found: ~A" len-mod))
   ;; check traits
   (let ((len-traits (+ (length *traits-cat*)
                        (length *traits-reg*))))
@@ -277,6 +290,71 @@
   ;; if all pass, then return  unmodified input
   experiments)
 
+(defun create-filenames (experiment &optional (show nil))
+  "taking an experiment dictionary return a dictionary of the expected files"
+  (when show (format t "~&~%In: create-filenames"))
+  (let* ((trait (first (acc:access experiment :trait)))
+         (objective (first (acc:access experiment :objective)))
+         (model0 (nth 0 (acc:access experiment :models)))
+         (model1 (nth 1 (acc:access experiment :models)))
+         (string-pred-0 (concatenate 'string "PREDICTED" "_" trait "_" objective "_" model0))
+         (string-pred-1 (concatenate 'string "PREDICTED" "_" trait "_" objective "_" model1))
+
+         ;; ground truth file
+         (trait-tiff (filepaths:join *tiffs-path*
+                                     (filepaths:with-extension trait *geotiff-extension*)))
+         ;; prediction file
+         (pred-0-tiff (filepaths:join *tiffs-path*
+                                      (filepaths:with-extension string-pred-0 *geotiff-extension*)))
+         ;; prediction file
+         (pred-1-tiff (filepaths:join *tiffs-path*
+                                     (filepaths:with-extension string-pred-1 *geotiff-extension*)))
+         ;; geopackage file
+         (area-gpkg *area-geopackage* )
+
+         ;; csv file
+         (table-csv *identities-csv* )
+
+         (return-dictionary `(:true ,trait-tiff
+                              :pred-0 ,pred-0-tiff
+                              :pred-1 ,pred-1-tiff
+                              :gpkg ,area-gpkg
+                              :table ,table-csv)))
+    (when show (format t "~&returning files: ~S" return-dictionary))
+    return-dictionary))
+
+(defun validate-files (experiments &optional show)
+  "for all experiment dictionaries in experiments, ensure the files exist"
+  (when show (format t "~&~%In: validate-files"))
+  (labels (
+           (validate-experiment (experiment)
+             (-<>
+                 (create-filenames experiment show)
+               (which-files-non-exist <>)))
+
+           (which-files-non-exist (files-dict)
+             ;; (and (pathnamep i) (null (probe-file i)))
+             (mapcar #'(lambda (i) (when (and (pathnamep i)
+                                              (not (org.shirakumo.filesystem-utils:file-exists-p i)))
+                                     i))
+                     files-dict))
+
+           (error-when-not-found (nils-or-files)
+             (if (every #'null nils-or-files)
+                 nil
+                 (progn
+                   (format t "~&~%Expected files not found: ~S" nils-or-files)
+                   (remove-if #'null nils-or-files))))
+           )
+    (let* (
+           (completed-checks (mapcar #'validate-experiment experiments))
+           (reporting (mapcar #'error-when-not-found completed-checks))
+           )
+      ;; if everything exists, pass on experiment dictionary unchanged
+      (if (every #'null reporting)
+          experiments
+          (error "~&~%These files were not found ~S" reporting)))))
+
 ;;;; ==================================== API
 
 (run-all-reports :show t)
@@ -285,17 +363,13 @@
 
 ;;;; ==================================== build
 
-(defun validate-files (experiments &optional show)
-  "for all experiment dictionaries in experiments, ensure the files exist"
-  (let* (())
-    (locals (())
-            (let* ()))))
+
 
 ;;;; run-all-reports
 ;;;; multiplex file-name-parts to dictionary
 ;;;; stats-calls into experimental run dictionary
 ;;;; validate all global settings
-;;;; &&& validate all filename file properties
+;;;; validate all filename file properties
 ;;;; &&& validate all filename statscalls existance/allowableness
 ;;;; &&& validate file set geospatial properties match
 ;;;; &&& call run-report for each
@@ -395,6 +469,17 @@
 
 ;;;; ==================================== scratch
 ;;;; ==================================== reference
+
+(let ((test-arg
+        '(:a (:1 (:A "haha")))))
+  (acc:accesses test-arg :a :1 :A))
+
+(labels (
+         (local-fun (arg)
+           (print "in local fun")
+           (format t "~&arg: ~A" arg))
+         )
+  (local-fun "haha"))
 
 #|
 &&&
