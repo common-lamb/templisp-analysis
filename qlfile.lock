@@ -2,14 +2,10 @@
  (:class qlot/source/dist:source-dist
   :initargs (:distribution "https://beta.quicklisp.org/dist/quicklisp.txt" :%version :latest)
   :version "2025-06-22"))
-("qlot" .
- (:class qlot/source/ql:source-ql
-  :initargs (:%version :latest)
-  :version "ql-2025-06-22"))
 ("coalton" .
  (:class qlot/source/github:source-github
   :initargs (:repos "coalton-lang/coalton" :ref nil :branch nil :tag nil)
-  :version "github-9adf06b9801ff02405c402ab17bf6bcd22aa33bc"))
+  :version "github-e036678655bebca1873332f0412051a803ab3c63"))
 ("fset" .
  (:class qlot/source/github:source-github
   :initargs (:repos "slburson/fset" :ref nil :branch nil :tag nil)
@@ -17,40 +13,8 @@
 ("misc-extensions" .
  (:class qlot/source/github:source-github
   :initargs (:repos "slburson/misc-extensions" :ref nil :branch nil :tag nil)
-  :version "github-1f70028cfd3b2d286d5311d64c41ae384fa15525"))
-("alexandria" .
- (:class qlot/source/ql:source-ql
-  :initargs (:%version :latest)
-  :version "ql-2024-10-12"))
-("access" .
- (:class qlot/source/ql:source-ql
-  :initargs (:%version :latest)
-  :version "ql-2025-06-22"))
-("arrow-macros" .
- (:class qlot/source/ql:source-ql
-  :initargs (:%version :latest)
-  :version "ql-2024-10-12"))
-("lisp-stat" .
- (:class qlot/source/ql:source-ql
-  :initargs (:%version :latest)
-  :version "ql-2025-06-22"))
-("cl-csv" .
- (:class qlot/source/ql:source-ql
-  :initargs (:%version :latest)
-  :version "ql-2024-10-12"))
-("cl-str" .
- (:class qlot/source/ql:source-ql
-  :initargs (:%version :latest)
-  :version "ql-2025-06-22"))
+  :version "github-515d3d9c70eb88413147931b39fcd27c5f728197"))
 ("fosskers-filepaths" .
  (:class qlot/source/ultralisp:source-ultralisp
   :initargs (:%version :latest)
-  :version "ultralisp-20250702134500"))
-("filesystem-utils" .
- (:class qlot/source/ql:source-ql
-  :initargs (:%version :latest)
-  :version "ql-2025-06-22"))
-("py4cl2" .
- (:class qlot/source/ql:source-ql
-  :initargs (:%version :latest)
-  :version "ql-2024-10-12"))
+  :version "ultralisp-20250724220000"))

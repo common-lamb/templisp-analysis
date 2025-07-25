@@ -24,10 +24,12 @@
 (ql:quickload :filepaths); ultralisp foskers-filepaths
 (ql:quickload :filesystem-utils)
 (ql:quickload :py4cl2)
+(ql:quickload :rcl)
 
 (defpackage :analysis
   (:use :cl)
   (:local-nicknames (:py :py4cl2 ))
+  (:local-nicknames (:r :rcl))
   (:local-nicknames (:col :coalton))
   (:local-nicknames (:csv :cl-csv))
   (:local-nicknames (:acc :access))
@@ -364,7 +366,6 @@
 ;;;; ==================================== build
 
 
-
 ;;;; run-all-reports
 ;;;; multiplex file-name-parts to dictionary
 ;;;; stats-calls into experimental run dictionary
@@ -468,7 +469,61 @@
 
 
 ;;;; ==================================== scratch
+
+(rcl:r-init)
+(rcl:r "R.Version")
+
+;; cant do this
+;; (rcl:r-quit)
+;; (rcl:r-init)
+
+;; (rcl:r "install.packages" "ggplot2")
+(rcl:r "library" "ggplot2")
+
+;;visualizing categorical data
+;; (r:r "install.packages" "vcd")
+(r:r "library" "vcd")
+
+;; functions for medical statistics book
+;; (r:r "install.packages" "fmsb")
+(r:r "library" "fmsb") ; for Kappa.test
+
+
+(r:r "Kappa.test" '(1 2 3 4) '(1 2 3 4)) ; &&& alpha
+
+(rcl:r% "summary" '(1 2 3 4 5 6 7 8 9)) ; pointer
+(rcl:r "summary" '(1 2 3 4 5 6 7 8 9)) ; alist
+(rcl:r "print" (rcl:r% "summary" '(1 2 3 4 5 6 7 8 9))) ; print
+(rcl:r% "print" (rcl:r% "summary" '(1 2 3 4 5 6 7 8 9)))
+
+(defun r-summary (lis)
+  "5 number summary"
+  (r:r "summary" lis))
+
+(r-summary '(1 2 3 4 5))
+
 ;;;; ==================================== reference
+
+;; mgl has confusion matrices
+;; lisp-stat has mean
+;; lisp-stat has sd
+;; lisp-stat has 5 num sum
+;; lisp-stat has histo
+;; lisp-stat has scatter
+;; sci kit learn has cohens kappa
+;; sci kit learn has jaccard
+;; scipy.stats has shapiro wilk test
+;; scipy.stats has parired t test
+;; scipy.stats has wilcoxon test
+;; stats models has levenes test
+;; stats models has kruskal wallis test
+;; stats models has tukey_hsd test
+;; stats models has chi squared test
+;; stats models has 2 way anova
+;; stats models has bowker test
+;; scipy.stats has false discovery rate
+;; stats models has effect size
+
 
 (let ((test-arg
         '(:a (:1 (:A "haha")))))

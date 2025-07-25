@@ -1,14 +1,4 @@
-
-ql qlot
 github coalton-lang/coalton
 github slburson/fset
 github slburson/misc-extensions
-ql alexandria
-ql access
-ql arrow-macros
-ql lisp-stat
-ql cl-csv
-ql cl-str
 ultralisp fosskers-filepaths
-ql filesystem-utils
-ql py4cl2
