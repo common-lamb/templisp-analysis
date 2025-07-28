@@ -10,7 +10,6 @@
 
                                         ; imports
 (ql:quickload :qlot)
-(ql:quickload :coalton)
 (ql:quickload :fset)
 (ql:quickload :misc-extensions)
 (ql:quickload :alexandria)
@@ -19,6 +18,8 @@
 (ql:quickload :arrow-macros)
 (ql:quickload :lparallel)
 (ql:quickload :lisp-stat)
+(ql:quickload :plot/vega)
+(ql:quickload :numcl)
 (ql:quickload :cl-csv)
 (ql:quickload :str)
 (ql:quickload :filepaths); ultralisp foskers-filepaths
@@ -30,7 +31,6 @@
   (:use :cl)
   (:local-nicknames (:py :py4cl2 ))
   (:local-nicknames (:r :rcl))
-  (:local-nicknames (:col :coalton))
   (:local-nicknames (:csv :cl-csv))
   (:local-nicknames (:acc :access))
   (:import-from :arrow-macros :-<> :<>))
@@ -43,6 +43,35 @@
 ;; set printer to limit depth of large objects
 (setf *print-level* 100)
 (setf *print-length* 50)
+
+;;;; ==================================== python interop setup
+                                        ; set config
+;; (py:initialize)
+;; (print py4cl2:*config*) ;; WARN: this triggers the company auto complete hang on lab linux
+;; py4cl2:*config* ;; WARN: this triggers the company auto complete hang on lab linux
+;; (setf (config-var pycmd) python3) ; set one field
+
+                                        ; ensure version and sys.path is same as python in cli
+(py:pyversion-info)    ; fails if python command is not resolved in system
+;; (py:defpymodule "sys" nil :lisp-package "SYS")
+;; (py:defpymodule "pprint" nil :lisp-package "PPRINT")
+;; (py:pyexec "pprint.pprint(sys.path)") ; check python path
+
+                                        ; py process hard reset
+;; (py:pystop)
+;; (py:python-alive-p)
+;; (py:pystart)
+                                        ; python imports
+(py:defpymodule "rasterio" t :lisp-package "PYRIO") ; drivers: GTiff GPKG
+(py:defpymodule "geopandas" t :lisp-package "PYGPD")
+(py:defpymodule "sklearn" t :lisp-package "PYSKL")
+(py:defpymodule "matplotlib.pyplot" nil :lisp-package "PYPLT")
+(py:defpymodule "scikitplot" t :lisp-package "PYSKP")
+(py:defpymodule "scipy" t :lisp-package "PYSCP")
+(py:defpymodule "statsmodels.api" nil :lisp-package "PYSMS")
+(py:defpymodule "statsmodels.stats" t :lisp-package "PYSMS")
+(py:defpymodule "statsmodels.sandbox" t :lisp-package "PYSMSB")
+(py:defpymodule "pingouin" t :lisp-package "PYPIN")
 
 ;;;; ==================================== contents
 
@@ -202,6 +231,7 @@
     (experiment-dictionary <> show)
     (validate-globals <> show)
     (validate-files <> show)
+    ;; (add-files <> show)
     ;; (validate-calls <> show)
     ;; (validate-geospatial <> show)
     ;; (run-report <> show)
@@ -371,16 +401,95 @@
 ;;;; stats-calls into experimental run dictionary
 ;;;; validate all global settings
 ;;;; validate all filename file properties
+;;;; add files to the experiment dictionary
 ;;;; &&& validate all filename statscalls existance/allowableness
 ;;;; &&& validate file set geospatial properties match
 ;;;; &&& call run-report for each
 
+;;;; ==================================== scratch
 
+;;;; ==================================== reference
 
+;; numcl has mean
+(numcl:mean)
+;; numcl has standard-deviation
+(numcl:standard-deviation)
+;; lisp-stat has 5 num sum in summarize column
+(lisp-stat:summarize-column)
+;; lisp-stat has histogram in mark bar
+;; lisp-stat has freq,%freq in tabulate
+(lisp-stat:tabulate)
+;; lisp-stat has barchart in mark bar
+;; skl has %correct
+(pyskl.metrics:accuracy-score)
+;; skl has cohens kappa
+(pyskl.metrics:cohen-kappa-score)
+;; skl has jaccard
+(pyskl.metrics:jaccard-score)
+;; lisp-stat has scatter
+;; skl has M2error, rootM2error, MAE,R2
+(pyskl.metrics:mean-squared-error)
+(pyskl.metrics:root-mean-squared-error)
+(pyskl.metrics:mean-absolute-error)
+(pyskl.metrics:r-2-score)
+;; skl has F1 recall precision accuracy
+(pyskl.metrics:f-1-score)
+(pyskl.metrics:recall-score)
+(pyskl.metrics:precision-score)
+(pyskl.metrics:accuracy-score)
+;; skp has confusion matrices
+(pyskp.metrics:confusion-matrix)
+;; pingouin has shapiro wilk test
+(pypin:normality)
+;; pingouin has paired t test
+(pypin:ttest)
+;; pingouin has wilcoxon test
+(pypin:wilcoxon)
+;; pingouin has mcnemars
+(pypin:chi-2-mcnemar)
+;; pingouin has levenes test
+(pypin:homoscedasticity)
+;; pingouin has 1 way anova
+(pypin:anova)
+;; pingouin has kruskal wallis test
+(pypin:kruskal)
+;; pingouin has tukey_hsd test
+(pypin:pairwise-tukey)
+;; pingouin has chi squared test
+(pypin:chi-2-independence)
+;; pingouin has 2 way anova
+(pypin:mixed-anova)
+;; stats models has bowker test
+(pysmsb.stats.runs:symmetry-bowker)
+;; pingouin has false discovery rate adjustment
+(pypin:multicomp)
+;; pingouin has effectsizes
+(pypin:compute-effsize)
+
+(let ((test-arg
+        '(:a (:1 (:A "haha")))))
+  (acc:accesses test-arg :a :1 :A))
+
+(labels (
+         (local-fun (arg)
+           (print "in local fun")
+           (format t "~&arg: ~A" arg))
+         )
+  (local-fun "haha"))
+
+#|
+&&&
+|#
+                                        ; X
+;;;; ==================================== X
+;;; ===================================== X
+;; ====================================== X
 
 (when (= 0 1)
   (print  "Begin never execute")
 
+
+  ;;;; py4cl setup
 
                                         ; set config
   ;; (py:initialize)
@@ -402,9 +511,12 @@
   ;; (py:python-alive-p)
   ;; (py:pystart)
                                         ; python imports
-  (py:defpymodule "rasterio" t :lisp-package "RASTERIO") ; drivers: GTiff GPKG
-  ;; (py:defpymodule "geopandas" nil :lisp-package "GEOPANDAS")
-  ;; (py:defpymodule "sklearn" nil :lisp-package "SKLEARN")
+  (py:defpymodule "rasterio" t :lisp-package "PYRIO") ; drivers: GTiff GPKG
+  (py:defpymodule "geopandas" nil :lisp-package "PYGPD")
+  (py:defpymodule "sklearn" nil :lisp-package "PYSKL")
+  (py:defpymodule "scipy" nil :lisp-package "PYSCP")
+  (py:defpymodule "statsmodels.api" nil :lisp-package "PYSMS")
+  (py:defpymodule "" nil :lisp-package "PY")
 
                                         ; open the file
   (defparameter *gtif-true* #P"/home/holdens/tempdata/predictions1percent/height.tiff")
@@ -465,89 +577,27 @@
   (inspect *read1*) ;; works
   (describe *read1*) ;; works
 
+;;;;;;;; rcl load
+
+  (rcl:r-init)
+  (rcl:r "R.Version")
+
+  ;; cant do this
+  ;; (rcl:r-quit)
+  ;; (rcl:r-init)
+
+  ;; (rcl:r "install.packages" "ggplot2")
+  (rcl:r "library" "ggplot2")
+  ;;visualizing categorical data
+  ;; (r:r "install.packages" "vcd")
+  (r:r "library" "vcd")
+  ;; functions for medical statistics book
+  ;; (r:r "install.packages" "fmsb")
+  (r:r "library" "fmsb") ; for Kappa.test
+
+  (rcl:r% "summary" '(1 2 3 4 5 6 7 8 9)) ; pointer
+  (rcl:r "summary" '(1 2 3 4 5 6 7 8 9)) ; alist
+  (rcl:r "print" (rcl:r% "summary" '(1 2 3 4 5 6 7 8 9))) ; print
+  (rcl:r% "print" (rcl:r% "summary" '(1 2 3 4 5 6 7 8 9)))
+
   (print  "End never execute"))
-
-
-;;;; ==================================== scratch
-
-(rcl:r-init)
-(rcl:r "R.Version")
-
-;; cant do this
-;; (rcl:r-quit)
-;; (rcl:r-init)
-
-;; (rcl:r "install.packages" "ggplot2")
-(rcl:r "library" "ggplot2")
-
-;;visualizing categorical data
-;; (r:r "install.packages" "vcd")
-(r:r "library" "vcd")
-
-;; functions for medical statistics book
-;; (r:r "install.packages" "fmsb")
-(r:r "library" "fmsb") ; for Kappa.test
-
-
-(r:r "Kappa.test" '(1 2 3 4) '(1 2 3 4)) ; &&& alpha
-
-(rcl:r% "summary" '(1 2 3 4 5 6 7 8 9)) ; pointer
-(rcl:r "summary" '(1 2 3 4 5 6 7 8 9)) ; alist
-(rcl:r "print" (rcl:r% "summary" '(1 2 3 4 5 6 7 8 9))) ; print
-(rcl:r% "print" (rcl:r% "summary" '(1 2 3 4 5 6 7 8 9)))
-
-(defun r-summary (lis)
-  "5 number summary"
-  (r:r "summary" lis))
-
-(r-summary '(1 2 3 4 5))
-
-;;;; ==================================== reference
-
-;; lisp-stat has mean
-;; lisp-stat has sd
-;; lisp-stat has 5 num sum
-;; lisp-stat has histo
-;; lisp-stat has freq %freq in tabulate
-;; lisp-stat has barchart
-;; lisp-stat can be used for %correct
-;; skl has cohens kappa
-;; skl has jaccard
-;; lisp-stat has scatter
-;; skl has M2 error,rootM2 error, MAE,R2
-;; skl has F1 recall precision accuracy
-;; skl has confusion matrices
-;; scipy stats has shapiro wilk test
-;; scipy stats has paired t test
-;; scipy stats has wilcoxon test
-;; stats models has mcnemars
-;; scipy stats has levenes test
-;; stats models has 1 way anova
-;; stats models has kruskal wallis test
-;; stats models has tukey_hsd test
-;; stats models has chi squared test
-;; stats models has 2 way anova
-;; stats models has bowker test
-;; stats models has false discovery rate adjustment
-;; stats models has effect size
-
-
-(let ((test-arg
-        '(:a (:1 (:A "haha")))))
-  (acc:accesses test-arg :a :1 :A))
-
-(labels (
-         (local-fun (arg)
-           (print "in local fun")
-           (format t "~&arg: ~A" arg))
-         )
-  (local-fun "haha"))
-
-#|
-&&&
-
-|#
-                                        ; X
-;;;; ==================================== X
-;;; ===================================== X
-;; ====================================== X

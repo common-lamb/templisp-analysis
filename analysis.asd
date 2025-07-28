@@ -13,6 +13,7 @@
 
                ;; analysis tools
                :lisp-stat ; ql lisp-stat
+               :numcl ;ql numcl
                :cl-csv ; ql cl-csv
                :cl-str ; ql cl-str
                :filepaths ; ultralisp fosskers-filepaths
