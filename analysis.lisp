@@ -504,24 +504,31 @@
 
 ;;;; ==================================== reference
 
-;; mgl has confusion matrices
 ;; lisp-stat has mean
 ;; lisp-stat has sd
 ;; lisp-stat has 5 num sum
 ;; lisp-stat has histo
+;; lisp-stat has freq %freq in tabulate
+;; lisp-stat has barchart
+;; lisp-stat can be used for %correct
+;; skl has cohens kappa
+;; skl has jaccard
 ;; lisp-stat has scatter
-;; sci kit learn has cohens kappa
-;; sci kit learn has jaccard
-;; scipy.stats has shapiro wilk test
-;; scipy.stats has parired t test
-;; scipy.stats has wilcoxon test
-;; stats models has levenes test
+;; skl has M2 error,rootM2 error, MAE,R2
+;; skl has F1 recall precision accuracy
+;; skl has confusion matrices
+;; scipy stats has shapiro wilk test
+;; scipy stats has paired t test
+;; scipy stats has wilcoxon test
+;; stats models has mcnemars
+;; scipy stats has levenes test
+;; stats models has 1 way anova
 ;; stats models has kruskal wallis test
 ;; stats models has tukey_hsd test
 ;; stats models has chi squared test
 ;; stats models has 2 way anova
 ;; stats models has bowker test
-;; scipy.stats has false discovery rate
+;; stats models has false discovery rate adjustment
 ;; stats models has effect size
 
 
