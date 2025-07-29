@@ -43,7 +43,7 @@
 
 ;; set printer to limit depth of large objects
 (setf *print-level* 100)
-(setf *print-length* 50)
+(setf *print-length* 1000)
 
 ;;;; ==================================== python interop setup
                                         ; set config
@@ -82,8 +82,7 @@
 ;;;; multiplex file-name-parts/stats-calls into experimental run dictionaries
 ;;;; validate all filename file properties
 ;;;; add all files to experiments
-;;;; validate all filename statscalls allowableness
-;;;; validate file set geospatial properties match
+;;;; validate fileset geospatial properties match
 ;;;; call run-report for each experiment
 
 ;;;; run-report
@@ -236,7 +235,6 @@
     (validate-globals <> show)
     (validate-files <> show)
     (add-files <> show)
-    ;; (validate-calls <> show)
     ;; (validate-geospatial <> show)
     ;; (run-report <> show)
     ))
@@ -404,6 +402,7 @@
            )
       (when show (format t "~&returning dictionary: ~S" with-files))
       with-files)))
+
 ;;;; ==================================== API
 
 (run-all-reports :show t)
@@ -418,11 +417,68 @@
 ;;;; validate all global settings
 ;;;; validate all filename file properties
 ;;;; add files to the experiment dictionary
-;;;; &&& validate all filename statscalls existance/allowableness
 ;;;; &&& validate file set geospatial properties match
 ;;;; &&& call run-report for each
 
+(defun validate-geospatial (experiments)
+  "Check that the geospatial properties of the files in an experiment are matched"
+  ;;; &&& check crs,
+  (let ()
+    (labels ()
+      (let* ()
+
+        ))))
+
 ;;;; ==================================== scratch
+
+;;;; check crs equality gtif to gpkg
+(py:pyeval (py:pyslot-value *dataset-gpkg* 'crs) "==" (py:pyslot-value *dataset-gtif* 'crs))
+
+;;;; check crs equality gtif to gtif
+(py:pyeval (py:pyslot-value *dataset-gtif* 'crs) "==" (py:pyslot-value *dataset-gtif* 'crs))
+
+;; compare bounds gpgk to gtif
+(+ (abs (-
+         (aref (py:pyslot-value *dataset-gpkg* "total_bounds") 0)
+         (py:pyslot-value *dataset-gtif* 'bounds.left)
+         ))
+   (abs (-
+         (aref (py:pyslot-value *dataset-gpkg* "total_bounds") 1)
+         (py:pyslot-value *dataset-gtif* 'bounds.bottom)
+         ))
+   (abs (-
+         (aref (py:pyslot-value *dataset-gpkg* "total_bounds") 2)
+         (py:pyslot-value *dataset-gtif* 'bounds.right)
+         ))
+   (abs (-
+         (aref (py:pyslot-value *dataset-gpkg* "total_bounds") 3)
+         (py:pyslot-value *dataset-gtif* 'bounds.top)
+         ))
+   )
+
+;; compare bounds gtif to gtif
+(+ (abs (-
+         (py:pyslot-value *dataset-gtif* 'bounds.left)
+         (py:pyslot-value *dataset-gtif* 'bounds.left)
+         ))
+   (abs (-
+         (py:pyslot-value *dataset-gtif* 'bounds.bottom)
+         (py:pyslot-value *dataset-gtif* 'bounds.bottom)
+         ))
+   (abs (-
+         (py:pyslot-value *dataset-gtif* 'bounds.right)
+         (py:pyslot-value *dataset-gtif* 'bounds.right)
+         ))
+   (abs (-
+         (py:pyslot-value *dataset-gtif* 'bounds.top)
+         (py:pyslot-value *dataset-gtif* 'bounds.top)
+         ))
+   )
+
+
+(defparameter *test-experiments* '((:FILES (:TRUE #P"/home/holdens/tempdata/predictions1percent/tiffs/HEIGHT-CM.tiff" :PRED-0 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_HEIGHT-CM_regression_GBM.tiff" :PRED-1 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_HEIGHT-CM_regression_TSAI.tiff" :GPKG #P"/home/holdens/tempdata/predictions1percent/gpkgs/temp-area.gpkg" :TABLE #P"/home/holdens/tempdata/predictions1percent/tables/temp-table.csv") :TRAIT ("HEIGHT-CM") :OBJECTIVE ("regression") :MODELS ("GBM" "TSAI") :TESTS (STAT-REG-DESCRIBE-TRUE-HISTO STAT-REG-DESCRIBE-TRUE-MEAN STAT-REG-DESCRIBE-PRED-HISTO STAT-REG-DESCRIBE-PRED-MEAN STAT-REG-COMPARE-PRED-R2 STAT-REG-COMPARE-PRED-RESIDUAL STAT-REG-COMPARE-MODELS-ANOVA)) (:FILES (:TRUE #P"/home/holdens/tempdata/predictions1percent/tiffs/BARLEY-WHEAT.tiff" :PRED-0 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_BARLEY-WHEAT_multiclass_GBM.tiff" :PRED-1 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_BARLEY-WHEAT_multiclass_TSAI.tiff" :GPKG #P"/home/holdens/tempdata/predictions1percent/gpkgs/temp-area.gpkg" :TABLE #P"/home/holdens/tempdata/predictions1percent/tables/temp-table.csv") :TRAIT ("BARLEY-WHEAT") :OBJECTIVE ("multiclass") :MODELS ("GBM" "TSAI") :TESTS (STAT-CAT-DESCRIBE-TRUE-BARCHART STAT-CAT-DESCRIBE-PRED-BARCHART STAT-CAT-COMPARE-PRED-F1 STAT-CAT-COMPARE-PRED-CONFUSIONMX STAT-CAT-COMPARE-MODELS-ANOVA))))
+
+(defparameter *test-experiment* '(:FILES (:TRUE #P"/home/holdens/tempdata/predictions1percent/tiffs/HEIGHT-CM.tiff" :PRED-0 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_HEIGHT-CM_regression_GBM.tiff" :PRED-1 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_HEIGHT-CM_regression_TSAI.tiff" :GPKG #P"/home/holdens/tempdata/predictions1percent/gpkgs/temp-area.gpkg" :TABLE #P"/home/holdens/tempdata/predictions1percent/tables/temp-table.csv") :TRAIT ("HEIGHT-CM") :OBJECTIVE ("regression") :MODELS ("GBM" "TSAI") :TESTS (STAT-REG-DESCRIBE-TRUE-HISTO STAT-REG-DESCRIBE-TRUE-MEAN STAT-REG-DESCRIBE-PRED-HISTO STAT-REG-DESCRIBE-PRED-MEAN STAT-REG-COMPARE-PRED-R2 STAT-REG-COMPARE-PRED-RESIDUAL STAT-REG-COMPARE-MODELS-ANOVA)))
 
 
 ;;;; ==================================== reference
@@ -502,76 +558,57 @@
 ;;; ===================================== X
 ;; ====================================== X
 
-(when (= 0 1)
-  (print  "Begin never execute")
 
+;;;; geopandas open gpkg
+(defparameter *geopackage* #P"/home/holdens/tempdata/predictions1percent/gpkgs/AOI-south.gpkg")
+(pygpd:read-file :filename (namestring *geopackage*))
+(defparameter *dataset-gpkg* (pygpd:read-file :filename (namestring *geopackage*)))
+(print *dataset-gpkg*)
+(py:pyslot-list *dataset-gpkg*)
+(py:pymethod-list *dataset-gpkg*)
 
-  ;;;; py4cl setup
+(py:pyslot-value *dataset-gpkg* "total_bounds")
+(py:pyslot-value *dataset-gpkg* "crs")
 
-                                        ; set config
-  ;; (py:initialize)
-  ;; (print py4cl2:*config*) ;; WARN: this triggers the company auto complete hang on lab linux
-  ;; py4cl2:*config* ;; WARN: this triggers the company auto complete hang on lab linux
-
-  ;; (setf (config-var pycmd) python3) ; set one field
-
-
-
-                                        ; ensure version and sys.path is same as python in cli
-  (py:pyversion-info)    ; fails if python command is not resolved in system
-  ;; (py:defpymodule "sys" nil :lisp-package "SYS")
-  ;; (py:defpymodule "pprint" nil :lisp-package "PPRINT")
-  ;; (py:pyexec "pprint.pprint(sys.path)")
-
-                                        ; py process hard reset
-  ;; (py:pystop)
-  ;; (py:python-alive-p)
-  ;; (py:pystart)
-                                        ; python imports
-  (py:defpymodule "rasterio" t :lisp-package "PYRIO") ; drivers: GTiff GPKG
-  (py:defpymodule "geopandas" nil :lisp-package "PYGPD")
-  (py:defpymodule "sklearn" nil :lisp-package "PYSKL")
-  (py:defpymodule "scipy" nil :lisp-package "PYSCP")
-  (py:defpymodule "statsmodels.api" nil :lisp-package "PYSMS")
-  (py:defpymodule "" nil :lisp-package "PY")
-
+;;;; rasterio open tiff
                                         ; open the file
-  (defparameter *gtif-true* #P"/home/holdens/tempdata/predictions1percent/height.tiff")
+(defparameter *gtif-true* #P"/home/holdens/tempdata/predictions1percent/tiffs/HEIGHT-CM.tiff")
 
-  ;; pythonic: dataset = rasterio.open('some.tif')
-  (defparameter *dataset* (rasterio:open :fp (namestring *gtif-true*)))
-  (print *dataset*)
-  (py:pyslot-list *dataset* ) ; ie. show me what data it has
-  ;; => ("__class__" "__dict__" "__doc__" "__firstlineno__" "__module__" "__pyx_vtable__" "__static_attributes__" "__weakref__" "_block_shapes" "_closed" "_count" "_crs" "_crs_wkt" "_descriptions" "_dtypes" "_env" "_gcps" "_nodatavals" "_offsets" "_rpcs" "_scales" "_transform" "_units" "block_shapes" "bounds" "closed" "colorinterp" "compression" "count" "crs" "descriptions" "driver" "dtypes" "files" "gcps" "height" "indexes" "interleaving" "is_tiled" "mask_flag_enums" "meta" "mode" "name" "nodata" "nodatavals" "offsets" "options" "photometric" "profile" "res" "rpcs" "scales" "shape" "subdatasets" "transform" "units" "width")
-  (py:pymethod-list *dataset*) ; ie show me what methods it has
-  ;; => ("__class__" "__delattr__" "__dir__" "__enter__" "__eq__" "__exit__" "__format__" "__ge__" "__getattribute__" "__getstate__" "__gt__" "__hash__" "__init__" "__init_subclass__" "__le__" "__lt__" "__ne__" "__new__" "__reduce__" "__reduce_ex__" "__repr__" "__setattr__" "__setstate__" "__sizeof__" "__str__" "__subclasshook__" "_get_crs" "_get_rpcs" "_handle_crswkt" "_has_band" "_has_gcps_or_rpcs" "_mask_flags" "_read" "_set_all_descriptions" "_set_all_offsets" "_set_all_scales" "_set_all_units" "_set_attrs_from_dataset_handle" "_set_crs" "_set_gcps" "_set_nodatavals" "_set_rpcs" "block_size" "block_window" "block_windows" "checksum" "close" "colormap" "dataset_mask" "get_gcps" "get_nodatavals" "get_tag_item" "get_transform" "index" "lnglat" "overviews" "read" "read_crs" "read_masks" "read_transform" "sample" "start" "statistics" "stats" "stop" "tag_namespaces" "tags" "window" "window_bounds" "window_transform" "write_transform" "xy")
+;; pythonic: dataset = rasterio.open('some.tif')
+(defparameter *dataset-gtif* (pyrio:open :fp (namestring *gtif-true*))) ; case sensitive!
+(print *dataset-gtif*)
+(py:pyslot-list *dataset-gtif* ) ; ie. show me what data it has
+(py:pymethod-list *dataset-gtif*) ; ie show me what methods it has
 
                                         ; operations on geotiff
 ;;;; slot actions
-  ;; dataset.name
-  (py:pyslot-value *dataset* 'name)
-  ;; dataset.count
-  (py:pyslot-value *dataset* 'count)
-  ;; dataset.dtypes
-  (py:pyslot-value *dataset* 'dtypes)
-  ;; dataset.crs
-  (py:pyslot-value *dataset* 'crs)
-  ;; dataset.shape
-  (py:pyslot-value *dataset* 'shape)
-  ;; dataset-bounds
-  (py:pyslot-value *dataset* 'bounds)
+
+;; dataset.bounds
+(py:pyslot-value *dataset-gtif* 'bounds)
+(py:pyslot-value *dataset-gtif* 'bounds.left)
+;; dataset.crs
+(py:pyslot-value *dataset-gtif* 'crs)
+;; dataset.dtypes
+(py:pyslot-value *dataset-gtif* 'dtypes)
+;; dataset.nodata
+(py:pyslot-value *dataset*-gtif 'nodata)
+;; dataset.shape
+(py:pyslot-value *dataset-gtif* 'shape)
 
 ;;;; method actions
-  ;; get nodata value
-  (py:pymethod *dataset* 'get_nodatavals) ; works
 
-  ;; get first band
-  ;; pythonic: dataset.read(1)
-  (py:pymethod *dataset* "read" 1)
-  ;; pythonic: read1 = dataset.read(1)
-  (defparameter *read1* (py:pymethod *dataset* "read" 1))
-  ;; close method when done &&&
-  ;; (py:pymethod *dataset* 'close)
+(py:pymethod *dataset-gtif* 'lnglat)
+(py:pymethod *dataset-gtif* 'get_nodatavals)
+(py:pymethod *dataset-gtif* 'read-crs)
+(py:pymethod *dataset-gtif* 'read-transform)
+
+;; get first band
+;; pythonic: dataset.read(1)
+(py:pymethod *dataset-gtif* "read" 1)
+;; pythonic: read1 = dataset.read(1)
+(defparameter *read1* (py:pymethod *dataset-gtif* "read" 1)) ;; => (SIMPLE-ARRAY SINGLE-FLOAT (1000 26500))
+;; close method when done &&&
+(py:pymethod *dataset-gtif* 'close)
 
 ;;;; simple array operations
   (make-array '(2 2))
@@ -594,7 +631,7 @@
   (inspect *read1*) ;; works
   (describe *read1*) ;; works
 
-;;;;;;;; rcl load
+;;;; rcl load
 
   (rcl:r-init)
   (rcl:r "R.Version")
@@ -616,5 +653,3 @@
   (rcl:r "summary" '(1 2 3 4 5 6 7 8 9)) ; alist
   (rcl:r "print" (rcl:r% "summary" '(1 2 3 4 5 6 7 8 9))) ; print
   (rcl:r% "print" (rcl:r% "summary" '(1 2 3 4 5 6 7 8 9)))
-
-  (print  "End never execute"))
