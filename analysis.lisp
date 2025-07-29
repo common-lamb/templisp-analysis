@@ -14,6 +14,7 @@
 (ql:quickload :misc-extensions)
 (ql:quickload :alexandria)
 (ql:quickload :serapeum)
+(ql:quickload :modf)
 (ql:quickload :access)
 (ql:quickload :arrow-macros)
 (ql:quickload :lparallel)
@@ -80,6 +81,7 @@
 ;;;; run-all-reports
 ;;;; multiplex file-name-parts/stats-calls into experimental run dictionaries
 ;;;; validate all filename file properties
+;;;; add all files to experiments
 ;;;; validate all filename statscalls allowableness
 ;;;; validate file set geospatial properties match
 ;;;; call run-report for each experiment
@@ -184,6 +186,8 @@
                              )
   "List of strings of traits for which the prediction objective was 'multiclass'")
 
+
+
                                         ; categorized statistics functions
 (defparameter *stats-reg-describe-true*'(
                                          stat-reg-describe-true-histo
@@ -231,7 +235,7 @@
     (experiment-dictionary <> show)
     (validate-globals <> show)
     (validate-files <> show)
-    ;; (add-files <> show)
+    (add-files <> show)
     ;; (validate-calls <> show)
     ;; (validate-geospatial <> show)
     ;; (run-report <> show)
@@ -387,6 +391,19 @@
           experiments
           (error "~&~%These files were not found ~S" reporting)))))
 
+(defun add-files (experiments &optional show)
+  "adds files to each experiment in the experiment dictionary"
+  (when show (format t "~&~%In: add-files"))
+  (labels (
+           (add-files-to-dict (experiment)
+             (modf:modf (getf experiment :files) (create-filenames experiment)))
+           )
+    (let* (
+           ;; (copied-experiments (mapcar #'(lambda (experiment) (copy-list experiment)) experiments))
+           (with-files (mapcar #'add-files-to-dict experiments))
+           )
+      (when show (format t "~&returning dictionary: ~S" with-files))
+      with-files)))
 ;;;; ==================================== API
 
 (run-all-reports :show t)
@@ -394,7 +411,6 @@
 ;;;; ==================================== FIN
 
 ;;;; ==================================== build
-
 
 ;;;; run-all-reports
 ;;;; multiplex file-name-parts to dictionary
@@ -407,6 +423,7 @@
 ;;;; &&& call run-report for each
 
 ;;;; ==================================== scratch
+
 
 ;;;; ==================================== reference
 

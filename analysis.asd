@@ -10,6 +10,7 @@
                :alexandria ; ql alexandria
                :access ; ql access
                :arrow-macros ; ql arrow-macros
+               :modf ; ql modf
 
                ;; analysis tools
                :lisp-stat ; ql lisp-stat
