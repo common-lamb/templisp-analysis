@@ -43,7 +43,7 @@
 
 ;; set printer to limit depth of large objects
 (setf *print-level* 100)
-(setf *print-length* 1000)
+(setf *print-length* 100)
 
 ;;;; ==================================== python interop setup
                                         ; set config
@@ -148,7 +148,7 @@
 
 (defparameter *tables-path* (filepaths:join *program-root* "tables"))
 
-(defparameter *area-geopackage* (filepaths:join *gpkgs-path* "temp-area.gpkg"))
+(defparameter *area-geopackage* (filepaths:join *gpkgs-path* "AOI-south.gpkg"))
 
 (defparameter *identities-csv* (filepaths:join *tables-path* "temp-table.csv"))
 ;; &&& other input files and subdirs
@@ -235,7 +235,7 @@
     (validate-globals <> show)
     (validate-files <> show)
     (add-files <> show)
-    ;; (validate-geospatial <> show)
+    (validate-geospatial <> show)
     ;; (run-report <> show)
     ))
 
@@ -403,6 +403,138 @@
       (when show (format t "~&returning dictionary: ~S" with-files))
       with-files)))
 
+(defun open-geopackage (gpkg-path)
+  ;; handles close of file
+  (pygpd:read-file :filename (namestring gpkg-path)))
+
+(defun open-geotiff (gtif-path)
+  ;; needs to be closed with: (py:pymethod python-object 'close)
+  (pyrio:open :fp (namestring gtif-path)))
+
+(defun partition-by-2 (list)
+  "returns a list with neighbours made into sublists (a b 1 2)=>((1 b) (b 1) (b 2))"
+  (labels (
+           (first-2 (list)
+             (let* (
+                    (a (nth 0 list))
+                    (b (nth 1 list))
+                    (paired (when (and a b) (list a b)))
+                    )
+               paired))
+           )
+    (let* (
+           (trailing-nil (maplist #'first-2 list))
+           (cleaned (butlast trailing-nil))
+           )
+      cleaned)))
+
+(defun validate-geospatial (experiments &optional show)
+  "Check that the geospatial properties of the files in an experiment are matched"
+  (when show (format t "~&~%In: validate-geospatial"))
+
+  ;;; &&& check crs, nodata, bounds within allowable
+  (let (
+        (allowable-bounds-diff 1)
+        )
+    (labels (
+             (check-experiment (experiment)
+               (let* (
+                      ;; get paths from dict
+                      (gpkg-path (acc:accesses experiment :files :gpkg))
+                      (true-path (acc:accesses experiment :files :true))
+                      (pred-0-path (acc:accesses experiment :files :pred-0))
+                      (pred-1-path (acc:accesses experiment :files :pred-1))
+                      ;; get py objects from paths
+                      (gpkg-obj (open-geopackage gpkg-path))
+                      (true-obj (open-geotiff true-path))
+                      (pred-0-obj (open-geotiff pred-0-path))
+                      (pred-1-obj (open-geotiff pred-1-path))
+                      ;; get details
+                      ;; gpkg crs left bottom right top ;; gpkg:gtif 0:left 1:bottom 2:right 3:top
+                      (gpkg-crs (py:pyslot-value gpkg-obj 'crs))
+                      (gpkg-left (aref (py:pyslot-value gpkg-obj "total_bounds") 0))
+                      (gpkg-bottom (aref (py:pyslot-value gpkg-obj "total_bounds") 1))
+                      (gpkg-right (aref (py:pyslot-value gpkg-obj "total_bounds") 2))
+                      (gpkg-top (aref (py:pyslot-value gpkg-obj "total_bounds") 3))
+                      ;; true crs nodatavalue left bottom right top
+                      (true-crs (py:pyslot-value true-obj 'crs))
+                      (true-ndv (py:pyslot-value true-obj 'nodata))
+                      (true-left (py:pyslot-value true-obj 'bounds.left))
+                      (true-bottom (py:pyslot-value true-obj 'bounds.bottom))
+                      (true-right (py:pyslot-value true-obj 'bounds.right))
+                      (true-top (py:pyslot-value true-obj 'bounds.top))
+                      ;; pred-0 crs nodatavalue left bottom right top
+                      (pred-0-crs (py:pyslot-value pred-0-obj 'crs))
+                      (pred-0-ndv (py:pyslot-value pred-0-obj 'nodata))
+                      (pred-0-left (py:pyslot-value pred-0-obj 'bounds.left))
+                      (pred-0-bottom (py:pyslot-value pred-0-obj 'bounds.bottom))
+                      (pred-0-right (py:pyslot-value pred-0-obj 'bounds.right))
+                      (pred-0-top (py:pyslot-value pred-0-obj 'bounds.top))
+                      ;; pred-1 crs nodatavalue left bottom right top
+                      (pred-1-crs (py:pyslot-value pred-1-obj 'crs))
+                      (pred-1-ndv (py:pyslot-value pred-1-obj 'nodata))
+                      (pred-1-left (py:pyslot-value pred-1-obj 'bounds.left))
+                      (pred-1-bottom (py:pyslot-value pred-1-obj 'bounds.bottom))
+                      (pred-1-right (py:pyslot-value pred-1-obj 'bounds.right))
+                      (pred-1-top (py:pyslot-value pred-1-obj 'bounds.top))
+                      ;; aggregate check lists
+                      (crss (list gpkg-crs true-crs pred-0-crs pred-1-crs))
+                      (lefts (list gpkg-left true-left pred-0-left pred-1-left))
+                      (bottoms (list gpkg-bottom true-bottom pred-0-bottom pred-1-bottom))
+                      (rights (list gpkg-right true-right pred-0-right pred-1-right))
+                      (tops (list gpkg-top true-top pred-0-top pred-1-top))
+                      (ndvs (list true-ndv pred-0-ndv pred-1-ndv))
+                      ;; run checks T passing
+                      (checked-crss (check-crss crss))
+                      (checked-lefts (check-bounds lefts))
+                      (checked-bottoms (check-bounds bottoms))
+                      (checked-rights (check-bounds rights))
+                      (checked-tops (check-bounds tops))
+                      (checked-ndvs (check-ndvs ndvs))
+                      ;; aggregate test status
+                      (all-tests (append checked-crss checked-lefts checked-bottoms checked-rights checked-tops checked-ndvs))
+                      (all-passing (every #'(lambda (a) (eq a T)) all-tests))
+                      ;; close geotiff objects
+                      (true-closed (py:pymethod true-obj 'close))
+                      (pred-0-closed (py:pymethod pred-0-obj 'close))
+                      (pred-1-closed (py:pymethod pred-1-obj 'close))
+                      )
+                 (unless all-passing
+                   (warn "~&~%Potential geospatial mismatch in experiment")
+                   ;; (format t "~& some identifying feature")
+                   (format t "~&crs: ~A" crss)
+                   (format t "~&left: ~A" lefts)
+                   (format t "~&bottom: ~A" bottoms)
+                   (format t "~&right: ~A" rights)
+                   (format t "~&tops: ~A" tops)
+                   (format t "~&nodata: ~A" ndvs))
+                 all-passing
+                 ))
+             (check-crss (crss)
+               (mapcar #'check-crs (partition-by-2 crss)))
+             (check-crs (pair)
+               (py:pyeval (nth 0 pair) "==" (nth 1 pair)))
+             ;;
+             (check-bounds (bounds) ; left bottom right top
+               (mapcar #'check-bound (partition-by-2 bounds)))
+             (check-bound (pair)
+               (<
+                (abs (- (nth 0 pair) (nth 1 pair)))
+                allowable-bounds-diff))
+             ;;
+             (check-ndvs (ndvs)
+               (mapcar #'check-ndv (partition-by-2 ndvs)))
+             (check-ndv (pair)
+               (= (nth 0 pair) (nth 1 pair)))
+             )
+      (let* (
+             (checked (mapcar #'check-experiment experiments))
+             )
+        (when show (format t "~&~%Experiments passing geospatial validation: ~A" checked))
+
+        experiments ;; pass dictionary on unchanged
+        ))))
+
 ;;;; ==================================== API
 
 (run-all-reports :show t)
@@ -417,69 +549,15 @@
 ;;;; validate all global settings
 ;;;; validate all filename file properties
 ;;;; add files to the experiment dictionary
-;;;; &&& validate file set geospatial properties match
-;;;; &&& call run-report for each
+;;;; validate file set geospatial properties match
+;;;; &&& call run-report for each, which has run single and then run meta for cross comparisons
 
-(defun validate-geospatial (experiments)
-  "Check that the geospatial properties of the files in an experiment are matched"
-  ;;; &&& check crs,
-  (let ()
-    (labels ()
-      (let* ()
-
-        ))))
 
 ;;;; ==================================== scratch
 
-;;;; check crs equality gtif to gpkg
-(py:pyeval (py:pyslot-value *dataset-gpkg* 'crs) "==" (py:pyslot-value *dataset-gtif* 'crs))
+(defparameter *test-experiments* '((:FILES (:TRUE #P"/home/holdens/tempdata/predictions1percent/tiffs/HEIGHT-CM.tiff" :PRED-0 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_HEIGHT-CM_regression_GBM.tiff" :PRED-1 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_HEIGHT-CM_regression_TSAI.tiff" :GPKG #P"/home/holdens/tempdata/predictions1percent/gpkgs/AOI-south.gpkg" :TABLE #P"/home/holdens/tempdata/predictions1percent/tables/temp-table.csv") :TRAIT ("HEIGHT-CM") :OBJECTIVE ("regression") :MODELS ("GBM" "TSAI") :TESTS (STAT-REG-DESCRIBE-TRUE-HISTO STAT-REG-DESCRIBE-TRUE-MEAN STAT-REG-DESCRIBE-PRED-HISTO STAT-REG-DESCRIBE-PRED-MEAN STAT-REG-COMPARE-PRED-R2 STAT-REG-COMPARE-PRED-RESIDUAL STAT-REG-COMPARE-MODELS-ANOVA)) (:FILES (:TRUE #P"/home/holdens/tempdata/predictions1percent/tiffs/BARLEY-WHEAT.tiff" :PRED-0 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_BARLEY-WHEAT_multiclass_GBM.tiff" :PRED-1 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_BARLEY-WHEAT_multiclass_TSAI.tiff" :GPKG #P"/home/holdens/tempdata/predictions1percent/gpkgs/AOI-south.gpkg" :TABLE #P"/home/holdens/tempdata/predictions1percent/tables/temp-table.csv") :TRAIT ("BARLEY-WHEAT") :OBJECTIVE ("multiclass") :MODELS ("GBM" "TSAI") :TESTS (STAT-CAT-DESCRIBE-TRUE-BARCHART STAT-CAT-DESCRIBE-PRED-BARCHART STAT-CAT-COMPARE-PRED-F1 STAT-CAT-COMPARE-PRED-CONFUSIONMX STAT-CAT-COMPARE-MODELS-ANOVA))))
 
-;;;; check crs equality gtif to gtif
-(py:pyeval (py:pyslot-value *dataset-gtif* 'crs) "==" (py:pyslot-value *dataset-gtif* 'crs))
-
-;; compare bounds gpgk to gtif
-(+ (abs (-
-         (aref (py:pyslot-value *dataset-gpkg* "total_bounds") 0)
-         (py:pyslot-value *dataset-gtif* 'bounds.left)
-         ))
-   (abs (-
-         (aref (py:pyslot-value *dataset-gpkg* "total_bounds") 1)
-         (py:pyslot-value *dataset-gtif* 'bounds.bottom)
-         ))
-   (abs (-
-         (aref (py:pyslot-value *dataset-gpkg* "total_bounds") 2)
-         (py:pyslot-value *dataset-gtif* 'bounds.right)
-         ))
-   (abs (-
-         (aref (py:pyslot-value *dataset-gpkg* "total_bounds") 3)
-         (py:pyslot-value *dataset-gtif* 'bounds.top)
-         ))
-   )
-
-;; compare bounds gtif to gtif
-(+ (abs (-
-         (py:pyslot-value *dataset-gtif* 'bounds.left)
-         (py:pyslot-value *dataset-gtif* 'bounds.left)
-         ))
-   (abs (-
-         (py:pyslot-value *dataset-gtif* 'bounds.bottom)
-         (py:pyslot-value *dataset-gtif* 'bounds.bottom)
-         ))
-   (abs (-
-         (py:pyslot-value *dataset-gtif* 'bounds.right)
-         (py:pyslot-value *dataset-gtif* 'bounds.right)
-         ))
-   (abs (-
-         (py:pyslot-value *dataset-gtif* 'bounds.top)
-         (py:pyslot-value *dataset-gtif* 'bounds.top)
-         ))
-   )
-
-
-(defparameter *test-experiments* '((:FILES (:TRUE #P"/home/holdens/tempdata/predictions1percent/tiffs/HEIGHT-CM.tiff" :PRED-0 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_HEIGHT-CM_regression_GBM.tiff" :PRED-1 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_HEIGHT-CM_regression_TSAI.tiff" :GPKG #P"/home/holdens/tempdata/predictions1percent/gpkgs/temp-area.gpkg" :TABLE #P"/home/holdens/tempdata/predictions1percent/tables/temp-table.csv") :TRAIT ("HEIGHT-CM") :OBJECTIVE ("regression") :MODELS ("GBM" "TSAI") :TESTS (STAT-REG-DESCRIBE-TRUE-HISTO STAT-REG-DESCRIBE-TRUE-MEAN STAT-REG-DESCRIBE-PRED-HISTO STAT-REG-DESCRIBE-PRED-MEAN STAT-REG-COMPARE-PRED-R2 STAT-REG-COMPARE-PRED-RESIDUAL STAT-REG-COMPARE-MODELS-ANOVA)) (:FILES (:TRUE #P"/home/holdens/tempdata/predictions1percent/tiffs/BARLEY-WHEAT.tiff" :PRED-0 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_BARLEY-WHEAT_multiclass_GBM.tiff" :PRED-1 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_BARLEY-WHEAT_multiclass_TSAI.tiff" :GPKG #P"/home/holdens/tempdata/predictions1percent/gpkgs/temp-area.gpkg" :TABLE #P"/home/holdens/tempdata/predictions1percent/tables/temp-table.csv") :TRAIT ("BARLEY-WHEAT") :OBJECTIVE ("multiclass") :MODELS ("GBM" "TSAI") :TESTS (STAT-CAT-DESCRIBE-TRUE-BARCHART STAT-CAT-DESCRIBE-PRED-BARCHART STAT-CAT-COMPARE-PRED-F1 STAT-CAT-COMPARE-PRED-CONFUSIONMX STAT-CAT-COMPARE-MODELS-ANOVA))))
-
-(defparameter *test-experiment* '(:FILES (:TRUE #P"/home/holdens/tempdata/predictions1percent/tiffs/HEIGHT-CM.tiff" :PRED-0 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_HEIGHT-CM_regression_GBM.tiff" :PRED-1 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_HEIGHT-CM_regression_TSAI.tiff" :GPKG #P"/home/holdens/tempdata/predictions1percent/gpkgs/temp-area.gpkg" :TABLE #P"/home/holdens/tempdata/predictions1percent/tables/temp-table.csv") :TRAIT ("HEIGHT-CM") :OBJECTIVE ("regression") :MODELS ("GBM" "TSAI") :TESTS (STAT-REG-DESCRIBE-TRUE-HISTO STAT-REG-DESCRIBE-TRUE-MEAN STAT-REG-DESCRIBE-PRED-HISTO STAT-REG-DESCRIBE-PRED-MEAN STAT-REG-COMPARE-PRED-R2 STAT-REG-COMPARE-PRED-RESIDUAL STAT-REG-COMPARE-MODELS-ANOVA)))
-
+(defparameter *test-experiment* '(:FILES (:TRUE #P"/home/holdens/tempdata/predictions1percent/tiffs/HEIGHT-CM.tiff" :PRED-0 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_HEIGHT-CM_regression_GBM.tiff" :PRED-1 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_HEIGHT-CM_regression_TSAI.tiff" :GPKG #P"/home/holdens/tempdata/predictions1percent/gpkgs/AOI-south.gpkg" :TABLE #P"/home/holdens/tempdata/predictions1percent/tables/temp-table.csv") :TRAIT ("HEIGHT-CM") :OBJECTIVE ("regression") :MODELS ("GBM" "TSAI") :TESTS (STAT-REG-DESCRIBE-TRUE-HISTO STAT-REG-DESCRIBE-TRUE-MEAN STAT-REG-DESCRIBE-PRED-HISTO STAT-REG-DESCRIBE-PRED-MEAN STAT-REG-COMPARE-PRED-R2 STAT-REG-COMPARE-PRED-RESIDUAL STAT-REG-COMPARE-MODELS-ANOVA)))
 
 ;;;; ==================================== reference
 
@@ -539,17 +617,6 @@
 ;; pingouin has effectsizes
 (pypin:compute-effsize)
 
-(let ((test-arg
-        '(:a (:1 (:A "haha")))))
-  (acc:accesses test-arg :a :1 :A))
-
-(labels (
-         (local-fun (arg)
-           (print "in local fun")
-           (format t "~&arg: ~A" arg))
-         )
-  (local-fun "haha"))
-
 #|
 &&&
 |#
@@ -558,11 +625,9 @@
 ;;; ===================================== X
 ;; ====================================== X
 
-
 ;;;; geopandas open gpkg
 (defparameter *geopackage* #P"/home/holdens/tempdata/predictions1percent/gpkgs/AOI-south.gpkg")
-(pygpd:read-file :filename (namestring *geopackage*))
-(defparameter *dataset-gpkg* (pygpd:read-file :filename (namestring *geopackage*)))
+(defparameter *dataset-gpkg* (pygpd:read-file :filename (namestring *geopackage*))) ; read_file handles close
 (print *dataset-gpkg*)
 (py:pyslot-list *dataset-gpkg*)
 (py:pymethod-list *dataset-gpkg*)
@@ -571,9 +636,7 @@
 (py:pyslot-value *dataset-gpkg* "crs")
 
 ;;;; rasterio open tiff
-                                        ; open the file
 (defparameter *gtif-true* #P"/home/holdens/tempdata/predictions1percent/tiffs/HEIGHT-CM.tiff")
-
 ;; pythonic: dataset = rasterio.open('some.tif')
 (defparameter *dataset-gtif* (pyrio:open :fp (namestring *gtif-true*))) ; case sensitive!
 (print *dataset-gtif*)
@@ -582,7 +645,6 @@
 
                                         ; operations on geotiff
 ;;;; slot actions
-
 ;; dataset.bounds
 (py:pyslot-value *dataset-gtif* 'bounds)
 (py:pyslot-value *dataset-gtif* 'bounds.left)
@@ -596,8 +658,6 @@
 (py:pyslot-value *dataset-gtif* 'shape)
 
 ;;;; method actions
-
-(py:pymethod *dataset-gtif* 'lnglat)
 (py:pymethod *dataset-gtif* 'get_nodatavals)
 (py:pymethod *dataset-gtif* 'read-crs)
 (py:pymethod *dataset-gtif* 'read-transform)
