@@ -6,76 +6,9 @@
 ;; attach repl
 ;; M-- ,' "qlot-8G-heap"
 
-;;;; ==================================== create package
-
-                                        ; imports
-(ql:quickload :qlot)
-(ql:quickload :fset)
-(ql:quickload :misc-extensions)
-(ql:quickload :alexandria)
-(ql:quickload :serapeum)
-(ql:quickload :modf)
-(ql:quickload :access)
-(ql:quickload :arrow-macros)
-(ql:quickload :lparallel)
-(ql:quickload :lisp-stat)
-(ql:quickload :plot/vega)
-(ql:quickload :numcl)
-(ql:quickload :cl-csv)
-(ql:quickload :str)
-(ql:quickload :filepaths); ultralisp foskers-filepaths
-(ql:quickload :filesystem-utils)
-(ql:quickload :py4cl2)
-(ql:quickload :rcl)
-
-(defpackage :analysis
-  (:use :cl)
-  (:local-nicknames (:py :py4cl2 ))
-  (:local-nicknames (:r :rcl))
-  (:local-nicknames (:csv :cl-csv))
-  (:local-nicknames (:acc :access))
-  (:import-from :arrow-macros :-<> :<>))
-
-                                        ; enter package
-(in-package :analysis)
-
-;;;; ==================================== package setup
-
-;; set printer to limit depth of large objects
-(setf *print-level* 100)
-(setf *print-length* 100)
-
-;;;; ==================================== python interop setup
-                                        ; set config
-;; (py:initialize)
-;; (print py4cl2:*config*) ;; WARN: this triggers the company auto complete hang on lab linux
-;; py4cl2:*config* ;; WARN: this triggers the company auto complete hang on lab linux
-;; (setf (config-var pycmd) python3) ; set one field
-
-                                        ; ensure version and sys.path is same as python in cli
-(py:pyversion-info)    ; fails if python command is not resolved in system
-;; (py:defpymodule "sys" nil :lisp-package "SYS")
-;; (py:defpymodule "pprint" nil :lisp-package "PPRINT")
-;; (py:pyexec "pprint.pprint(sys.path)") ; check python path
-
-                                        ; py process hard reset
-;; (py:pystop)
-;; (py:python-alive-p)
-;; (py:pystart)
-                                        ; python imports
-(py:defpymodule "rasterio" t :lisp-package "PYRIO") ; drivers: GTiff GPKG
-(py:defpymodule "geopandas" t :lisp-package "PYGPD")
-(py:defpymodule "sklearn" t :lisp-package "PYSKL")
-(py:defpymodule "matplotlib.pyplot" nil :lisp-package "PYPLT")
-(py:defpymodule "scikitplot" t :lisp-package "PYSKP")
-(py:defpymodule "scipy" t :lisp-package "PYSCP")
-(py:defpymodule "statsmodels.api" nil :lisp-package "PYSMS")
-(py:defpymodule "statsmodels.stats" t :lisp-package "PYSMS")
-(py:defpymodule "statsmodels.sandbox" t :lisp-package "PYSMSB")
-(py:defpymodule "pingouin" t :lisp-package "PYPIN")
-
 ;;;; ==================================== contents
 
+;; setup
 ;; global variables
 
 ;;;; run-all-reports
@@ -83,15 +16,26 @@
 ;;;; validate all filename file properties
 ;;;; add all files to experiments
 ;;;; validate fileset geospatial properties match
-;;;; call run-report for each experiment
+;;;; call coordinate-reports
 
-;;;; run-report
+;;;; coordinate-reports
+;;;; call run-single-reports
+;;;; call run-meta-reports
+;;;; call produce-report-document
+
+;;;; run-single-reports
 ;;;; call create matrix
 ;;;; call mx-manipulations
 ;;;; call mx->lstat
 ;;;; call make-plots
 ;;;; call stat-tests
 ;;;; call compose-report
+
+;;;; run-meta-reports
+;;;; &&&
+
+;;;; produce-report-document
+;;;; &&&
 
 ;;;; create matrix
 ;;;; call gpkg->array
@@ -134,6 +78,78 @@
 ;;;; format stat-test text
 ;;;; save report to disk
 ;;;; optional display in buffer
+
+;;;; ==================================== create package
+
+                                        ; imports
+(ql:quickload :qlot)
+(ql:quickload :fset)
+(ql:quickload :misc-extensions)
+(ql:quickload :alexandria)
+(ql:quickload :serapeum)
+(ql:quickload :modf)
+(ql:quickload :access)
+(ql:quickload :arrow-macros)
+(ql:quickload :lparallel)
+(ql:quickload :lisp-stat)
+(ql:quickload :plot/vega)
+(ql:quickload :numcl)
+(ql:quickload :cl-csv)
+(ql:quickload :str)
+(ql:quickload :filepaths); ultralisp foskers-filepaths
+(ql:quickload :filesystem-utils)
+(ql:quickload :py4cl2)
+(ql:quickload :rcl)
+
+(defpackage :analysis
+  (:use :cl)
+  (:local-nicknames (:py :py4cl2 ))
+  (:local-nicknames (:r :rcl))
+  (:local-nicknames (:csv :cl-csv))
+  (:local-nicknames (:acc :access))
+  (:import-from :arrow-macros :-<> :<>)
+  (:import-from :serapeum :dict)
+  (:import-from :modf :modf)
+  )
+
+                                        ; enter package
+(in-package :analysis)
+
+;;;; ==================================== package setup
+
+;; set printer to limit depth of large objects
+(setf *print-level* 100)
+(setf *print-length* 100)
+
+;;;; ==================================== python interop setup
+                                        ; set config
+;; (py:initialize)
+;; (print py4cl2:*config*) ;; WARN: this triggers the company auto complete hang on lab linux
+;; py4cl2:*config* ;; WARN: this triggers the company auto complete hang on lab linux
+;; (setf (config-var pycmd) python3) ; set one field
+
+                                        ; ensure version and sys.path is same as python in cli
+(py:pyversion-info)    ; fails if python command is not resolved in system
+;; (py:defpymodule "sys" nil :lisp-package "SYS")
+;; (py:defpymodule "pprint" nil :lisp-package "PPRINT")
+;; (py:pyexec "pprint.pprint(sys.path)") ; check python path
+
+                                        ; py process hard reset
+;; (py:pystop)
+;; (py:python-alive-p)
+;; (py:pystart)
+                                        ; python imports
+(py:defpymodule "rasterio" t :lisp-package "PYRIO") ; drivers: GTiff GPKG
+(py:defpymodule "geopandas" t :lisp-package "PYGPD")
+(py:defpymodule "sklearn" t :lisp-package "PYSKL")
+(py:defpymodule "matplotlib.pyplot" nil :lisp-package "PYPLT")
+(py:defpymodule "scikitplot" t :lisp-package "PYSKP")
+(py:defpymodule "scipy" t :lisp-package "PYSCP")
+(py:defpymodule "statsmodels.api" nil :lisp-package "PYSMS")
+(py:defpymodule "statsmodels.stats" t :lisp-package "PYSMS")
+(py:defpymodule "statsmodels.sandbox" t :lisp-package "PYSMSB")
+(py:defpymodule "pingouin" t :lisp-package "PYPIN")
+
 
 ;;;; ==================================== global variables
 
@@ -225,6 +241,16 @@
                                            ;; stat-cat-compare-models- &&&
                                            ))
 
+;;;; ==================================== Utilities
+
+(defun gat (obj &rest keys)
+  "transparent access to many datatypes"
+  (apply #'access:accesses obj keys))
+
+(defun sat (new obj &rest keys)
+  "non mutating transparent value setting via access "
+  (nth-value 1 (apply #'access:set-accesses new obj keys)))
+
 ;;;; ==================================== Functions
 
 (defun run-all-reports (&key (show nil))
@@ -236,7 +262,7 @@
     (validate-files <> show)
     (add-files <> show)
     (validate-geospatial <> show)
-    ;; (run-report <> show)
+    (coordinate-reports <> show)
     ))
 
 (defun filename-parts (&optional (show nil))
@@ -412,7 +438,7 @@
   (pyrio:open :fp (namestring gtif-path)))
 
 (defun partition-by-2 (list)
-  "returns a list with neighbours made into sublists (a b 1 2)=>((1 b) (b 1) (b 2))"
+  "returns a list with neighbours made into sublists (a b 1 2)=>((a b) (b 1) (1 2))"
   (labels (
            (first-2 (list)
              (let* (
@@ -530,10 +556,19 @@
       (let* (
              (checked (mapcar #'check-experiment experiments))
              )
-        (when show (format t "~&~%Experiments passing geospatial validation: ~A" checked))
-
+        (when show (format t "~%Experiments passing geospatial validation: ~A" checked))
         experiments ;; pass dictionary on unchanged
         ))))
+
+(defun coordinate-reports (experiments &optional show)
+  "&&& incomplete. Calls phases of report making"
+  (when show (format t "~&~% In: coordinate reports"))
+  (-<>
+      (run-single-reports experiments show)
+    ;; (run-meta-reports <> show)
+    ;; (produce-report-document <> show)
+    ;; &&& maybe emit something to be returned at the end
+    ))
 
 ;;;; ==================================== API
 
@@ -543,15 +578,10 @@
 
 ;;;; ==================================== build
 
-;;;; run-all-reports
-;;;; multiplex file-name-parts to dictionary
-;;;; stats-calls into experimental run dictionary
-;;;; validate all global settings
-;;;; validate all filename file properties
-;;;; add files to the experiment dictionary
-;;;; validate file set geospatial properties match
-;;;; &&& call run-report for each, which has run single and then run meta for cross comparisons
-
+(defun run-single-reports (experiments &optional show)
+  "Adds the single report stats to each experiment dictionary"
+  (when show (format t "~&~%In: run single reports"))
+  )
 
 ;;;; ==================================== scratch
 
@@ -563,7 +593,7 @@
 
 ;; numcl has mean
 (numcl:mean)
-;; numcl has standard-deviation
+numcl has standard-deviation
 (numcl:standard-deviation)
 ;; lisp-stat has 5 num sum in summarize column
 (lisp-stat:summarize-column)
@@ -616,14 +646,6 @@
 (pypin:multicomp)
 ;; pingouin has effectsizes
 (pypin:compute-effsize)
-
-#|
-&&&
-|#
-                                        ; X
-;;;; ==================================== X
-;;; ===================================== X
-;; ====================================== X
 
 ;;;; geopandas open gpkg
 (defparameter *geopackage* #P"/home/holdens/tempdata/predictions1percent/gpkgs/AOI-south.gpkg")
@@ -713,3 +735,26 @@
   (rcl:r "summary" '(1 2 3 4 5 6 7 8 9)) ; alist
   (rcl:r "print" (rcl:r% "summary" '(1 2 3 4 5 6 7 8 9))) ; print
   (rcl:r% "print" (rcl:r% "summary" '(1 2 3 4 5 6 7 8 9)))
+
+(defparameter *test* '(:a 1 :b 2 :c (:A one)))
+(serapeum:plist-keys *test*)
+(serapeum:plist-values *test*)
+
+(sat "new" *test* :c)
+(sat "new" *test* :c :a)
+(sat "new" *test* :c :b) ; create new b in list
+(sat "new" *test* :c :b '(:new :type :plist)) ; create new nesting
+
+(gat *test* :c)
+(gat *test* :c :a)
+(gat *test* :c :a)
+(gat *test* :c :b) ; nil when nothing there
+
+
+#|
+&&&
+|#
+                                        ; X
+;;;; ==================================== X
+;;; ===================================== X
+;; ====================================== X
