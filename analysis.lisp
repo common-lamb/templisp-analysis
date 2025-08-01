@@ -278,7 +278,7 @@
     (validate-files <> show)
     (add-files <> show)
     (validate-geospatial <> show)
-    ;; (coordinate-reports <> show)
+    (coordinate-reports <> show)
     ))
 
 (defun filename-parts (&optional (show nil))
@@ -449,7 +449,7 @@
            ;; (copied-experiments (mapcar #'(lambda (experiment) (copy-list experiment)) experiments))
            (with-files (mapcar #'add-files-to-dict experiments))
            )
-      (when show (format t "~&returning dictionary: ~S" with-files))
+      (when show (format t "~&Returning: ~S" with-files))
       with-files)))
 
 (defun open-geopackage (gpkg-path)
@@ -598,29 +598,95 @@
 
 ;;;; ==================================== build
 
+(defun call-funs-on-args (funs args)
+  " Funcall all the funs on an args dictionary
+args: a plist of args which will be passed into each of the called funs
+funs: a list of symbols which are callable functions, each of which takes the args plist and returns a results plist"
+  (mapcar (lambda (func)
+            (funcall func args))
+          funs))
+
+(defun interleave (l1 l2)
+  "alternates items of l1 and l2, stopping with the shortest"
+  (apply #'append ;; this "lifts" the first level of nesting left by (list key value)
+         (map 'list
+              (lambda (k v) (list k v))
+              l1 l2)))
+
+(defun spoof-test-1 (arguments)
+  (let* (
+         (res (format nil "~A ~A ~A"
+                      (gat arguments :a1)
+                      (gat arguments :a2)
+                      (gat arguments :a3)))
+         (id "test-1")
+         (ret-dict (list
+                    :message res
+                    :from id))
+         )
+    ret-dict
+    ))
+
+(defun spoof-test-2 (arguments)
+  (let* (
+         (res (format nil "~A ~A ~A"
+                      (gat arguments :a1)
+                      "even smoller"
+                      (gat arguments :a3)))
+         (id "test-2")
+         (ret-dict (list
+                    :message res
+                    :from id))
+         )
+    ret-dict
+    ))
+
 (defun run-single-reports (experiments &optional show)
   "Adds the single report stats to each experiment dictionary"
   (when show (format t "~&~%In: run single reports"))
   (labels (
-           (choose-experiment (experiment)
-             (let ((o (first (gat experiment :objective))))
-               (cond
-                 ((string= o "regression")
-                  (print "&&& do regression"))
-                 ((string= o "multiclass")
-                  (print "&&& do multiclass"))
-                 )))
+           (run-experiment (experiment)
+             (let* (
+                    ;; real values
+                    (tests (gat experiment :tests))
+                    (files (gat experiment :files))
+                    ;; &&& spoof values
+                    (tests '(spoof-test-1 spoof-test-2))
+                    (arguments '(:A1 "hello" :A2 "smol" :A3 "frog"))
+                    ;; open files
+                    ;; create arrays
+                    ;; manipulate arrays
+                    ;; make an arguments plist
+                    ;; use the preamble
+                    (result-dicts (call-funs-on-args tests arguments))
+                    ;; close files
+                    ;; re compose the result-maps
+                    (keyed-result-dicts (interleave (mapcar #'symbol->keyword tests) result-dicts))
+                    ;; compose the return dict
+                    (completed-experiment (sat keyed-result-dicts experiment :results))
+                    )
+               ;; (print "check prints")
+               ;; (print keyed-result-dicts)
+               ;; (print completed-experiment)
+               ;; return value
+               completed-experiment
+               ))
+           ;; other label funs
+           (symbol->keyword (sym) (intern (symbol-name sym) :keyword))
            )
+    (let* (
+           (completed-experiments (mapcar #'run-experiment experiments))
+           )
+      (when show (format t "~&Returning: ~S" completed-experiments))
+      completed-experiments
+      )))
 
-          (let* (
-                 (completed-experiments (mapcar #'choose-experiment experiments))
-                 )
-            completed-experiments
-            )))
-
-(run-single-reports *test-experiments*)
+(run-single-reports *test-experiments* t)
 
 ;;;; ==================================== scratch
+
+(defparameter *test-experiments* '((:FILES (:TRUE #P"/home/holdens/tempdata/predictions1percent/tiffs/HEIGHT-CM.tiff" :PRED-0 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_HEIGHT-CM_regression_GBM.tiff" :PRED-1 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_HEIGHT-CM_regression_TSAI.tiff" :GPKG #P"/home/holdens/tempdata/predictions1percent/gpkgs/AOI-south.gpkg" :TABLE #P"/home/holdens/tempdata/predictions1percent/tables/temp-table.csv") :TRAIT ("HEIGHT-CM") :OBJECTIVE ("regression") :MODELS ("GBM" "TSAI") :TESTS (STAT-REG-DESCRIBE-TRUE-HISTO STAT-REG-DESCRIBE-TRUE-MEAN STAT-REG-DESCRIBE-PRED-HISTO STAT-REG-DESCRIBE-PRED-MEAN STAT-REG-COMPARE-PRED-R2 STAT-REG-COMPARE-PRED-RESIDUAL) :META-TESTS (META-STAT-REG-COMPARE-MODELS-ANOVA))
+                                   (:FILES (:TRUE #P"/home/holdens/tempdata/predictions1percent/tiffs/BARLEY-WHEAT.tiff" :PRED-0 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_BARLEY-WHEAT_multiclass_GBM.tiff" :PRED-1 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_BARLEY-WHEAT_multiclass_TSAI.tiff" :GPKG #P"/home/holdens/tempdata/predictions1percent/gpkgs/AOI-south.gpkg" :TABLE #P"/home/holdens/tempdata/predictions1percent/tables/temp-table.csv") :TRAIT ("BARLEY-WHEAT") :OBJECTIVE ("multiclass") :MODELS ("GBM" "TSAI") :TESTS (STAT-CAT-DESCRIBE-TRUE-BARCHART STAT-CAT-DESCRIBE-PRED-BARCHART STAT-CAT-COMPARE-PRED-F1 STAT-CAT-COMPARE-PRED-CONFUSIONMX) :META-TESTS (META-STAT-CAT-COMPARE-MODELS-ANOVA))))
 
 (defparameter *test-experiments* '((:FILES (:TRUE #P"/home/holdens/tempdata/predictions1percent/tiffs/HEIGHT-CM.tiff" :PRED-0 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_HEIGHT-CM_regression_GBM.tiff" :PRED-1 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_HEIGHT-CM_regression_TSAI.tiff" :GPKG #P"/home/holdens/tempdata/predictions1percent/gpkgs/AOI-south.gpkg" :TABLE #P"/home/holdens/tempdata/predictions1percent/tables/temp-table.csv") :TRAIT ("HEIGHT-CM") :OBJECTIVE ("regression") :MODELS ("GBM" "TSAI") :TESTS (STAT-REG-DESCRIBE-TRUE-HISTO STAT-REG-DESCRIBE-TRUE-MEAN STAT-REG-DESCRIBE-PRED-HISTO STAT-REG-DESCRIBE-PRED-MEAN STAT-REG-COMPARE-PRED-R2 STAT-REG-COMPARE-PRED-RESIDUAL) :META-TESTS (META-STAT-REG-COMPARE-MODELS-ANOVA)) (:FILES (:TRUE #P"/home/holdens/tempdata/predictions1percent/tiffs/BARLEY-WHEAT.tiff" :PRED-0 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_BARLEY-WHEAT_multiclass_GBM.tiff" :PRED-1 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_BARLEY-WHEAT_multiclass_TSAI.tiff" :GPKG #P"/home/holdens/tempdata/predictions1percent/gpkgs/AOI-south.gpkg" :TABLE #P"/home/holdens/tempdata/predictions1percent/tables/temp-table.csv") :TRAIT ("BARLEY-WHEAT") :OBJECTIVE ("multiclass") :MODELS ("GBM" "TSAI") :TESTS (STAT-CAT-DESCRIBE-TRUE-BARCHART STAT-CAT-DESCRIBE-PRED-BARCHART STAT-CAT-COMPARE-PRED-F1 STAT-CAT-COMPARE-PRED-CONFUSIONMX) :META-TESTS (META-STAT-CAT-COMPARE-MODELS-ANOVA))))
 
