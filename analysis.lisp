@@ -12,7 +12,7 @@
 ;; global variables
 
 ;;;; run-all-reports
-;;;; multiplex file-name-parts/stats-calls into experimental run dictionaries
+;;;; demultiplex file-name-parts/stats-calls into experimental run dictionaries
 ;;;; validate all filename file properties
 ;;;; add all files to experiments
 ;;;; validate fileset geospatial properties match
@@ -174,6 +174,8 @@
 
 (defparameter *output-root* (filepaths:join *program-root*  "output"))
 ;; &&& output subdirs
+;; &&& output files
+;; &&& on init ensure empty output structures
 
                                         ; input tif filename components
 (defparameter *models* '(
@@ -181,6 +183,7 @@
                          "TSAI"
                          )
   "List of strings naming models which are to be compared")
+
 (defparameter *traits-reg* '(
                              "HEIGHT-CM"
                              ;; "AREA"
@@ -192,6 +195,7 @@
                              ;; "WEIGHT"
                              )
   "List of strings of traits for which the prediction objective was 'regression'")
+
 (defparameter *traits-cat* '(
                              "BARLEY-WHEAT"
                              ;; "HULLED"
@@ -201,9 +205,8 @@
                              )
   "List of strings of traits for which the prediction objective was 'multiclass'")
 
-
-
                                         ; categorized statistics functions
+;; tests within a single experiment
 (defparameter *stats-reg-describe-true*'(
                                          stat-reg-describe-true-histo
                                          stat-reg-describe-true-mean
@@ -232,23 +235,36 @@
                                          stat-cat-compare-pred-confusionMX
                                          ;; stat-cat-compare-pred- &&&
                                          ))
-(defparameter *stats-reg-compare-models* '(
-                                           stat-reg-compare-models-anova
-                                           ;; stat-reg-compare-models- &&&
-                                           ))
-(defparameter *stats-cat-compare-models* '(
-                                           stat-cat-compare-models-anova
-                                           ;; stat-cat-compare-models- &&&
-                                           ))
+;; meta tests across experiments
+(defparameter *meta-stats-reg-compare-models* '(
+                                                meta-stat-reg-compare-models-anova
+                                                ;; stat-reg-compare-models- &&&
+                                                ))
+(defparameter *meta-stats-cat-compare-models* '(
+                                                meta-stat-cat-compare-models-anova
+                                                ;; meta-stat-cat-compare-models- &&&
+                                                ))
 
 ;;;; ==================================== Utilities
 
+;; AT
+;; library for transparent operations on multi datastructures
+;; site referencing works like access:accesses
+;; immutability works like modf:modf
+;; gat get (gets all elements at key)
+;; sat set (sets all elements at key)
+;; cat? check (checks for all elements existance)
+;; hat? has (checks for single element existance)
+;; pat push (adds single element at key)
+;; rat remove (removes single element at key)
+;; mat make (tests for non preexistance then runs sat)
+
 (defun gat (obj &rest keys)
-  "transparent access to many datatypes"
+  "get at (gets all elements at key)"
   (apply #'access:accesses obj keys))
 
 (defun sat (new obj &rest keys)
-  "non mutating transparent value setting via access "
+  "set at (sets all elements at key)"
   (nth-value 1 (apply #'access:set-accesses new obj keys)))
 
 ;;;; ==================================== Functions
@@ -262,7 +278,7 @@
     (validate-files <> show)
     (add-files <> show)
     (validate-geospatial <> show)
-    (coordinate-reports <> show)
+    ;; (coordinate-reports <> show)
     ))
 
 (defun filename-parts (&optional (show nil))
@@ -301,18 +317,25 @@
                                ((string= objective "regression")
                                 (append *stats-reg-describe-true*
                                         *stats-reg-describe-pred*
-                                        *stats-reg-compare-pred*
-                                        (when (>= (length models) 2)
-                                          *stats-reg-compare-models*)))
+                                        *stats-reg-compare-pred*))
                                ((string= objective "multiclass")
                                 (append *stats-cat-describe-true*
                                         *stats-cat-describe-pred*
-                                        *stats-cat-compare-pred*
-                                        (when (>= (length models) 2)
-                                          *stats-cat-compare-models*)))
-                               (t (error "Unknown objective: ~A" objective))))
+                                        *stats-cat-compare-pred*))
+                               ;; &&& any more to add
+                               (t (error "Unknown objective: ~A" objective))
+                               ))
+             (selected-meta-tests (cond
+                                    ((string= objective "regression")
+                                     (append *meta-stats-reg-compare-models*))
+                                    ((string= objective "multiclass")
+                                     (append *meta-stats-cat-compare-models*))
+                                    ;; &&& any more to add
+                                    (t (error "Unknown objective: ~A" objective))
+                                    ))
              (experiment-plist (copy-list experiment))
-             (test-plist (list :tests selected-tests)))
+             (test-plist (list :tests selected-tests
+                               :meta-tests selected-meta-tests)))
         (push (append experiment-plist test-plist) completed-experiments)))
     (setf completed-experiments (nreverse completed-experiments))
     (when show
@@ -333,17 +356,19 @@
   (let ((len-traits (+ (length *traits-cat*)
                        (length *traits-reg*))))
     (assert (<= 1 len-traits) () "The number of traits (in either *traits-reg* *traits-cat*) must be at least 1"))
-  (let ((stats-all (append *stats-reg-describe-true* *stats-cat-describe-true* *stats-reg-describe-pred* *stats-cat-describe-pred* *stats-reg-compare-pred* *stats-cat-compare-pred* *stats-reg-compare-models* *stats-cat-compare-models*))))
 
   ;; check that the stats functions in all *stats-...* lists exist
-  (let ((stats-all (append *stats-reg-describe-true*
-                           *stats-cat-describe-true*
-                           *stats-reg-describe-pred*
-                           *stats-cat-describe-pred*
-                           *stats-reg-compare-pred*
-                           *stats-cat-compare-pred*
-                           *stats-reg-compare-models*
-                           *stats-cat-compare-models*)))
+  (let ((stats-all (append
+                    *stats-reg-describe-true*
+                    *stats-cat-describe-true*
+                    *stats-reg-describe-pred*
+                    *stats-cat-describe-pred*
+                    *stats-reg-compare-pred*
+                    *stats-cat-compare-pred*
+                    *meta-stats-reg-compare-models*
+                    *meta-stats-cat-compare-models*
+                    ;; &&& any more to add
+                    )))
     (dolist (i stats-all)
       (when (not (fboundp i))
         (warn "The function ~A must exist" i))))
@@ -359,7 +384,6 @@
          (model1 (nth 1 (acc:access experiment :models)))
          (string-pred-0 (concatenate 'string "PREDICTED" "_" trait "_" objective "_" model0))
          (string-pred-1 (concatenate 'string "PREDICTED" "_" trait "_" objective "_" model1))
-
          ;; ground truth file
          (trait-tiff (filepaths:join *tiffs-path*
                                      (filepaths:with-extension trait *geotiff-extension*)))
@@ -371,15 +395,14 @@
                                      (filepaths:with-extension string-pred-1 *geotiff-extension*)))
          ;; geopackage file
          (area-gpkg *area-geopackage* )
-
          ;; csv file
          (table-csv *identities-csv* )
-
-         (return-dictionary `(:true ,trait-tiff
-                              :pred-0 ,pred-0-tiff
-                              :pred-1 ,pred-1-tiff
-                              :gpkg ,area-gpkg
-                              :table ,table-csv)))
+         (return-dictionary (list
+                             :true trait-tiff
+                             :pred-0 pred-0-tiff
+                             :pred-1 pred-1-tiff
+                             :gpkg area-gpkg
+                             :table table-csv)))
     (when show (format t "~&returning files: ~S" return-dictionary))
     return-dictionary))
 
@@ -458,10 +481,7 @@
   "Check that the geospatial properties of the files in an experiment are matched"
   (when show (format t "~&~%In: validate-geospatial"))
 
-  ;;; &&& check crs, nodata, bounds within allowable
-  (let (
-        (allowable-bounds-diff 1)
-        )
+  (let ((allowable-bounds-diff 1))
     (labels (
              (check-experiment (experiment)
                (let* (
@@ -561,13 +581,13 @@
         ))))
 
 (defun coordinate-reports (experiments &optional show)
-  "&&& incomplete. Calls phases of report making"
-  (when show (format t "~&~% In: coordinate reports"))
+  "Calls phases of report making"
+  (when show (format t "~&~% In: coordinate reports &&& incomplete."))
   (-<>
       (run-single-reports experiments show)
     ;; (run-meta-reports <> show)
     ;; (produce-report-document <> show)
-    ;; &&& maybe emit something to be returned at the end
+    ;; &&& maybe emit something to be returned to call-all-reports at the end
     ))
 
 ;;;; ==================================== API
@@ -581,13 +601,30 @@
 (defun run-single-reports (experiments &optional show)
   "Adds the single report stats to each experiment dictionary"
   (when show (format t "~&~%In: run single reports"))
-  )
+  (labels (
+           (choose-experiment (experiment)
+             (let ((o (first (gat experiment :objective))))
+               (cond
+                 ((string= o "regression")
+                  (print "&&& do regression"))
+                 ((string= o "multiclass")
+                  (print "&&& do multiclass"))
+                 )))
+           )
+
+          (let* (
+                 (completed-experiments (mapcar #'choose-experiment experiments))
+                 )
+            completed-experiments
+            )))
+
+(run-single-reports *test-experiments*)
 
 ;;;; ==================================== scratch
 
-(defparameter *test-experiments* '((:FILES (:TRUE #P"/home/holdens/tempdata/predictions1percent/tiffs/HEIGHT-CM.tiff" :PRED-0 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_HEIGHT-CM_regression_GBM.tiff" :PRED-1 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_HEIGHT-CM_regression_TSAI.tiff" :GPKG #P"/home/holdens/tempdata/predictions1percent/gpkgs/AOI-south.gpkg" :TABLE #P"/home/holdens/tempdata/predictions1percent/tables/temp-table.csv") :TRAIT ("HEIGHT-CM") :OBJECTIVE ("regression") :MODELS ("GBM" "TSAI") :TESTS (STAT-REG-DESCRIBE-TRUE-HISTO STAT-REG-DESCRIBE-TRUE-MEAN STAT-REG-DESCRIBE-PRED-HISTO STAT-REG-DESCRIBE-PRED-MEAN STAT-REG-COMPARE-PRED-R2 STAT-REG-COMPARE-PRED-RESIDUAL STAT-REG-COMPARE-MODELS-ANOVA)) (:FILES (:TRUE #P"/home/holdens/tempdata/predictions1percent/tiffs/BARLEY-WHEAT.tiff" :PRED-0 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_BARLEY-WHEAT_multiclass_GBM.tiff" :PRED-1 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_BARLEY-WHEAT_multiclass_TSAI.tiff" :GPKG #P"/home/holdens/tempdata/predictions1percent/gpkgs/AOI-south.gpkg" :TABLE #P"/home/holdens/tempdata/predictions1percent/tables/temp-table.csv") :TRAIT ("BARLEY-WHEAT") :OBJECTIVE ("multiclass") :MODELS ("GBM" "TSAI") :TESTS (STAT-CAT-DESCRIBE-TRUE-BARCHART STAT-CAT-DESCRIBE-PRED-BARCHART STAT-CAT-COMPARE-PRED-F1 STAT-CAT-COMPARE-PRED-CONFUSIONMX STAT-CAT-COMPARE-MODELS-ANOVA))))
+(defparameter *test-experiments* '((:FILES (:TRUE #P"/home/holdens/tempdata/predictions1percent/tiffs/HEIGHT-CM.tiff" :PRED-0 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_HEIGHT-CM_regression_GBM.tiff" :PRED-1 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_HEIGHT-CM_regression_TSAI.tiff" :GPKG #P"/home/holdens/tempdata/predictions1percent/gpkgs/AOI-south.gpkg" :TABLE #P"/home/holdens/tempdata/predictions1percent/tables/temp-table.csv") :TRAIT ("HEIGHT-CM") :OBJECTIVE ("regression") :MODELS ("GBM" "TSAI") :TESTS (STAT-REG-DESCRIBE-TRUE-HISTO STAT-REG-DESCRIBE-TRUE-MEAN STAT-REG-DESCRIBE-PRED-HISTO STAT-REG-DESCRIBE-PRED-MEAN STAT-REG-COMPARE-PRED-R2 STAT-REG-COMPARE-PRED-RESIDUAL) :META-TESTS (META-STAT-REG-COMPARE-MODELS-ANOVA)) (:FILES (:TRUE #P"/home/holdens/tempdata/predictions1percent/tiffs/BARLEY-WHEAT.tiff" :PRED-0 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_BARLEY-WHEAT_multiclass_GBM.tiff" :PRED-1 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_BARLEY-WHEAT_multiclass_TSAI.tiff" :GPKG #P"/home/holdens/tempdata/predictions1percent/gpkgs/AOI-south.gpkg" :TABLE #P"/home/holdens/tempdata/predictions1percent/tables/temp-table.csv") :TRAIT ("BARLEY-WHEAT") :OBJECTIVE ("multiclass") :MODELS ("GBM" "TSAI") :TESTS (STAT-CAT-DESCRIBE-TRUE-BARCHART STAT-CAT-DESCRIBE-PRED-BARCHART STAT-CAT-COMPARE-PRED-F1 STAT-CAT-COMPARE-PRED-CONFUSIONMX) :META-TESTS (META-STAT-CAT-COMPARE-MODELS-ANOVA))))
 
-(defparameter *test-experiment* '(:FILES (:TRUE #P"/home/holdens/tempdata/predictions1percent/tiffs/HEIGHT-CM.tiff" :PRED-0 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_HEIGHT-CM_regression_GBM.tiff" :PRED-1 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_HEIGHT-CM_regression_TSAI.tiff" :GPKG #P"/home/holdens/tempdata/predictions1percent/gpkgs/AOI-south.gpkg" :TABLE #P"/home/holdens/tempdata/predictions1percent/tables/temp-table.csv") :TRAIT ("HEIGHT-CM") :OBJECTIVE ("regression") :MODELS ("GBM" "TSAI") :TESTS (STAT-REG-DESCRIBE-TRUE-HISTO STAT-REG-DESCRIBE-TRUE-MEAN STAT-REG-DESCRIBE-PRED-HISTO STAT-REG-DESCRIBE-PRED-MEAN STAT-REG-COMPARE-PRED-R2 STAT-REG-COMPARE-PRED-RESIDUAL STAT-REG-COMPARE-MODELS-ANOVA)))
+(defparameter *test-experiment* (first *test-experiments*))
 
 ;;;; ==================================== reference
 
