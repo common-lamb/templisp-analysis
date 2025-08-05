@@ -149,7 +149,8 @@
 (py:defpymodule "statsmodels.stats" t :lisp-package "PYSMS")
 (py:defpymodule "statsmodels.sandbox" t :lisp-package "PYSMSB")
 (py:defpymodule "pingouin" t :lisp-package "PYPIN")
-
+(py:defpymodule "pandas" t :lisp-package "PYPND")
+(py:defpymodule "numpy" t :lisp-package "PYNPY")
 
 ;;;; ==================================== global variables
 
@@ -685,22 +686,32 @@ funs: a list of symbols which are callable functions, each of which takes the ar
 
 ;;;; ==================================== scratch
 
-(defparameter *test-experiments* '((:FILES (:TRUE #P"/home/holdens/tempdata/predictions1percent/tiffs/HEIGHT-CM.tiff" :PRED-0 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_HEIGHT-CM_regression_GBM.tiff" :PRED-1 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_HEIGHT-CM_regression_TSAI.tiff" :GPKG #P"/home/holdens/tempdata/predictions1percent/gpkgs/AOI-south.gpkg" :TABLE #P"/home/holdens/tempdata/predictions1percent/tables/temp-table.csv") :TRAIT ("HEIGHT-CM") :OBJECTIVE ("regression") :MODELS ("GBM" "TSAI") :TESTS (STAT-REG-DESCRIBE-TRUE-HISTO STAT-REG-DESCRIBE-TRUE-MEAN STAT-REG-DESCRIBE-PRED-HISTO STAT-REG-DESCRIBE-PRED-MEAN STAT-REG-COMPARE-PRED-R2 STAT-REG-COMPARE-PRED-RESIDUAL) :META-TESTS (META-STAT-REG-COMPARE-MODELS-ANOVA))
-                                   (:FILES (:TRUE #P"/home/holdens/tempdata/predictions1percent/tiffs/BARLEY-WHEAT.tiff" :PRED-0 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_BARLEY-WHEAT_multiclass_GBM.tiff" :PRED-1 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_BARLEY-WHEAT_multiclass_TSAI.tiff" :GPKG #P"/home/holdens/tempdata/predictions1percent/gpkgs/AOI-south.gpkg" :TABLE #P"/home/holdens/tempdata/predictions1percent/tables/temp-table.csv") :TRAIT ("BARLEY-WHEAT") :OBJECTIVE ("multiclass") :MODELS ("GBM" "TSAI") :TESTS (STAT-CAT-DESCRIBE-TRUE-BARCHART STAT-CAT-DESCRIBE-PRED-BARCHART STAT-CAT-COMPARE-PRED-F1 STAT-CAT-COMPARE-PRED-CONFUSIONMX) :META-TESTS (META-STAT-CAT-COMPARE-MODELS-ANOVA))))
-
 (defparameter *test-experiments* '((:FILES (:TRUE #P"/home/holdens/tempdata/predictions1percent/tiffs/HEIGHT-CM.tiff" :PRED-0 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_HEIGHT-CM_regression_GBM.tiff" :PRED-1 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_HEIGHT-CM_regression_TSAI.tiff" :GPKG #P"/home/holdens/tempdata/predictions1percent/gpkgs/AOI-south.gpkg" :TABLE #P"/home/holdens/tempdata/predictions1percent/tables/temp-table.csv") :TRAIT ("HEIGHT-CM") :OBJECTIVE ("regression") :MODELS ("GBM" "TSAI") :TESTS (STAT-REG-DESCRIBE-TRUE-HISTO STAT-REG-DESCRIBE-TRUE-MEAN STAT-REG-DESCRIBE-PRED-HISTO STAT-REG-DESCRIBE-PRED-MEAN STAT-REG-COMPARE-PRED-R2 STAT-REG-COMPARE-PRED-RESIDUAL) :META-TESTS (META-STAT-REG-COMPARE-MODELS-ANOVA)) (:FILES (:TRUE #P"/home/holdens/tempdata/predictions1percent/tiffs/BARLEY-WHEAT.tiff" :PRED-0 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_BARLEY-WHEAT_multiclass_GBM.tiff" :PRED-1 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_BARLEY-WHEAT_multiclass_TSAI.tiff" :GPKG #P"/home/holdens/tempdata/predictions1percent/gpkgs/AOI-south.gpkg" :TABLE #P"/home/holdens/tempdata/predictions1percent/tables/temp-table.csv") :TRAIT ("BARLEY-WHEAT") :OBJECTIVE ("multiclass") :MODELS ("GBM" "TSAI") :TESTS (STAT-CAT-DESCRIBE-TRUE-BARCHART STAT-CAT-DESCRIBE-PRED-BARCHART STAT-CAT-COMPARE-PRED-F1 STAT-CAT-COMPARE-PRED-CONFUSIONMX) :META-TESTS (META-STAT-CAT-COMPARE-MODELS-ANOVA))))
 
 (defparameter *test-experiment* (first *test-experiments*))
 
+(defparameter *test-array* (make-array '(2 2) :initial-contents '((1.0 2.0) (3.0 4.0)) :element-type 'single-float))
+
+(defparameter *test-array* (numcl:arange 0 1000))
+
+(defun simple-array->numcl-array (simple-array)
+  (numcl:asarray simple-array))
+
+(defparameter *test-array-numcl* (simple-array->numcl-array *test-array*)) ;; to numcl array
+
+(pyscp.stats:relfreq :a *test-array-numcl* :numbins 20 )
 ;;;; ==================================== reference
 
 ;; numcl has mean
-(numcl:mean)
-numcl has standard-deviation
-(numcl:standard-deviation)
-;; lisp-stat has 5 num sum in summarize column
-(lisp-stat:summarize-column)
+(numcl:mean *test-array-numcl*)
+;; numcl has standard-deviation
+(numcl:standard-deviation *test-array-numcl*)
+;; 5 num sum is min 25 50 75 max
+(pyscp.stats:describe :a (numcl:flatten *test-array-numcl*))
+(pynpy:percentile :a *test-array-numcl* :q 50)
+;; vvv &&&
 ;; lisp-stat has histogram in mark bar
+
 ;; lisp-stat has freq,%freq in tabulate
 (lisp-stat:tabulate)
 ;; lisp-stat has barchart in mark bar
@@ -796,9 +807,10 @@ numcl has standard-deviation
 (py:pymethod *dataset-gtif* 'close)
 
 ;;;; simple array operations
-  (make-array '(2 2))
-  (make-array '(2 2) :initial-element nil)
-  (make-array '(2 2) :initial-contents '((1 2) (3 4)))
+(make-array '(2 2))
+(make-array '(2 2) :initial-element nil)
+(make-array '(2 2) :initial-contents '((1 2) (3 4)))
+(type-of (make-array '(2 2) :element-type 'single-float)) ;; => (SIMPLE-ARRAY SINGLE-FLOAT (2 2))
 
   (defparameter *test-array* (make-array '(2 2) :initial-element 4))
   (defparameter *test-tens* (make-array '(2 2 2) :initial-element 8))
@@ -857,7 +869,20 @@ numcl has standard-deviation
 #|
 &&&
 |#
-                                        ; X
+
+(defun numcl-array->lispstat-column (numcl-array &optional (col-name :unnamed) (col-type :integer))
+  (assert (numcl:numcl-array-p numcl-array) () "Must be a numcl-array")
+  (assert (= 2 (length (array-dimensions numcl-array))) () "Must be 2D ie. single layered" )
+  (let* (
+         (flat (numcl:flatten numcl-array))
+         (df (lisp-stat:make-df `(,col-name) `(,flat) ))
+         (df-bound (lisp-stat:boundp 'temp-df))
+         (unmade (when df-bound (lisp-stat:undef temp-df))) ;; conditionally unbind
+         (made (lisp-stat:defdf temp-df df)) ;; worked and returnable
+         (typed (lisp-stat:set-properties temp-df :type `(,col-name ,col-type))) ; worked (must return temp-df)
+         )
+    temp-df
+    ))                                       ; X
 ;;;; ==================================== X
 ;;; ===================================== X
 ;; ====================================== X
