@@ -158,12 +158,15 @@
 (defparameter *program-root* #P"/home/holdens/tempdata/predictions1percent/"
               "Pathname to a dir containing the dirs specified below" )
 
-(defparameter *tiffs-path* (filepaths:join *program-root* "tiffs")
+(defparameter *input-path* (filepaths:join *program-root* "input"))
+;; &&& ensure input exists
+
+(defparameter *tiffs-path* (filepaths:join *input-path* "tiffs")
   "string of the dir in the input-root containing all tiff files. mandatory naming format:<TRAIT>.tiff OR PREDICTED_<TRAIT>_<objective>_<MODEL>.tiff")
 
-(defparameter *gpkgs-path* (filepaths:join *program-root* "gpkgs"))
+(defparameter *gpkgs-path* (filepaths:join *input-path* "gpkgs"))
 
-(defparameter *tables-path* (filepaths:join *program-root* "tables"))
+(defparameter *tables-path* (filepaths:join *input-path* "tables"))
 
 (defparameter *area-geopackage* (filepaths:join *gpkgs-path* "AOI-south.gpkg"))
 
@@ -174,9 +177,12 @@
   "file extension used for the geotiff files. one of \"tif\" or \"tiff\" (no dot) ")
 
 (defparameter *output-root* (filepaths:join *program-root*  "output"))
-;; &&& output subdirs
-;; &&& output files
-;; &&& on init ensure empty output structures
+
+(defparameter *plots-path*  (filepaths:join *output-root* "plots"))
+
+(defparameter *reports-path* (filepaths:join *output-root* "reports"))
+
+(defparameter *report* (filepaths:join *reports-path* "report.txt"))
 
                                         ; input tif filename components
 (defparameter *models* '(
@@ -282,10 +288,32 @@
     (coordinate-reports <> show)
     ))
 
+(defun initialize-outputs ()
+  "ensure empty output dirs and files"
+  (let (
+        ;; must pad with x then ascend to get trailing /
+        (dop (filepaths:parent (filepaths:join *output-root* "x")))
+        (dplt (filepaths:parent (filepaths:join *plots-path* "x")))
+        (drpt (filepaths:parent (filepaths:join *reports-path* "x")))
+        (frpt *report*)
+        )
+    ;; op must exist
+    (ensure-directories-exist dop)
+    ;; plots exists and is empty
+    (uiop:delete-directory-tree dplt :validate t :if-does-not-exist :ignore)
+    (ensure-directories-exist dplt)
+    ;; reports path and file exists
+    (ensure-directories-exist drpt)
+    ;; report file is empty
+    (with-open-file (stream frpt :direction :output
+                                 :if-exists :supersede))
+    ))
+
 (defun filename-parts (&optional (show nil))
   "Create a list of filename components"
   (when show
     (format t "~&~%In: filename-parts"))
+  (initialize-outputs)
   (let ((experiments '()))
     (dolist (trait *traits-reg*)
       ;; build a p list of lists for the experiment
@@ -690,8 +718,11 @@ funs: a list of symbols which are callable functions, each of which takes the ar
 
 (defparameter *test-experiment* (first *test-experiments*))
 
-(defparameter *test-array* (make-array '(2 2) :initial-contents '((1.0 2.0) (3.0 4.0)) :element-type 'single-float))
-
+;; 3x3 1-9
+(defparameter *test-array* (make-array '(3 3) :initial-contents '((1.0 2.0 3.0) (4.0 5.0 6.0) (7.0 8.0 9.0)) :element-type 'single-float))
+;; 100x100 all 100
+(defparameter *test-array* (make-array '(100 100) :initial-element 100.0 :element-type 'single-float))
+;; 1000x1 0-9999
 (defparameter *test-array* (numcl:arange 0 1000))
 
 (defun simple-array->numcl-array (simple-array)
@@ -700,6 +731,56 @@ funs: a list of symbols which are callable functions, each of which takes the ar
 (defparameter *test-array-numcl* (simple-array->numcl-array *test-array*)) ;; to numcl array
 
 (pyscp.stats:relfreq :a *test-array-numcl* :numbins 20 )
+
+
+(defun numcl-array->lispstat-column (numcl-array)
+  (assert (numcl:numcl-array-p numcl-array) () "Must be a numcl-array")
+  (assert (= 2 (length (array-dimensions numcl-array))) () "Must be 2D ie. single layered" )
+  (let* (
+         (col-name :unnamed)
+         (flat (numcl:flatten numcl-array))
+         (df (lisp-stat:make-df `(,col-name) `(,flat) ))
+         (df-bound (lisp-stat:boundp 'temp-df))
+         (unmade (when df-bound (lisp-stat:undef temp-df))) ;; conditionally unbind
+         (made (lisp-stat:defdf temp-df df)) ;; worked and returnable
+         ;; (typed (lisp-stat:set-properties temp-df :type `(,col-name ,col-type))) ; worked (must return temp-df)
+         )
+    made
+    ))
+
+
+(defparameter *test-ls-col* (numcl-array->lispstat-column *test-array-numcl*))
+
+(defparameter *test-plot*
+  (vega:defplot test-plot
+    `(
+      :title (:text "Main Title"
+              :subtitle "subtitle")
+      :width 400
+      :height 400
+      :data (:values ,*test-ls-col*)
+      :mark (:type :bar :tooltip t)
+      ;; :transform #()
+      :encoding (:x (
+                     :title "X title"
+                     :field :unnamed
+                     :bin (:maxbins 8)
+                     )
+                 :y (
+                     :title "Y title"
+                     :aggregate :count
+                     )))))
+
+(plot:plot *test-plot*)
+
+(uiop:file-pathname-p #P"~/tempdata/testop/bar.html")
+(vega:write-html *test-plot* #P"/home/holdens/tempdata/testop/bar.html")
+
+(plot:plot-from-file #P"~/tempdata/testop/bar.html" :browser :firefox)
+
+
+
+
 ;;;; ==================================== reference
 
 ;; numcl has mean
@@ -869,20 +950,7 @@ funs: a list of symbols which are callable functions, each of which takes the ar
 #|
 &&&
 |#
-
-(defun numcl-array->lispstat-column (numcl-array &optional (col-name :unnamed) (col-type :integer))
-  (assert (numcl:numcl-array-p numcl-array) () "Must be a numcl-array")
-  (assert (= 2 (length (array-dimensions numcl-array))) () "Must be 2D ie. single layered" )
-  (let* (
-         (flat (numcl:flatten numcl-array))
-         (df (lisp-stat:make-df `(,col-name) `(,flat) ))
-         (df-bound (lisp-stat:boundp 'temp-df))
-         (unmade (when df-bound (lisp-stat:undef temp-df))) ;; conditionally unbind
-         (made (lisp-stat:defdf temp-df df)) ;; worked and returnable
-         (typed (lisp-stat:set-properties temp-df :type `(,col-name ,col-type))) ; worked (must return temp-df)
-         )
-    temp-df
-    ))                                       ; X
 ;;;; ==================================== X
 ;;; ===================================== X
 ;; ====================================== X
+                                        ; X
