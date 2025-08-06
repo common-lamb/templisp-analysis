@@ -307,7 +307,9 @@
     ;; report file is empty
     (with-open-file (stream frpt :direction :output
                                  :if-exists :supersede))
-    ))
+    )
+
+  (print "Initialized output directories and report file"))
 
 (defun filename-parts (&optional (show nil))
   "Create a list of filename components"
@@ -379,8 +381,8 @@
   ;; check models
   (let ((len-mod (length *models*)))
     (assert (= 2 len-mod)
-        ()
-        "The number of models in *models* must be 2. Found: ~A" len-mod))
+            ()
+            "The number of models in *models* must be 2. Found: ~A" len-mod))
   ;; check traits
   (let ((len-traits (+ (length *traits-cat*)
                        (length *traits-reg*))))
@@ -421,7 +423,7 @@
                                       (filepaths:with-extension string-pred-0 *geotiff-extension*)))
          ;; prediction file
          (pred-1-tiff (filepaths:join *tiffs-path*
-                                     (filepaths:with-extension string-pred-1 *geotiff-extension*)))
+                                      (filepaths:with-extension string-pred-1 *geotiff-extension*)))
          ;; geopackage file
          (area-gpkg *area-geopackage* )
          ;; csv file
@@ -722,16 +724,13 @@ funs: a list of symbols which are callable functions, each of which takes the ar
 (defparameter *test-array* (make-array '(3 3) :initial-contents '((1.0 2.0 3.0) (4.0 5.0 6.0) (7.0 8.0 9.0)) :element-type 'single-float))
 ;; 100x100 all 100
 (defparameter *test-array* (make-array '(100 100) :initial-element 100.0 :element-type 'single-float))
-;; 1000x1 0-9999
-(defparameter *test-array* (numcl:arange 0 1000))
+;; 50x20 0-9999
+(defparameter *test-array* (numcl:reshape (numcl:arange 0 1000) '(50 -1)))
 
 (defun simple-array->numcl-array (simple-array)
   (numcl:asarray simple-array))
 
-(defparameter *test-array-numcl* (simple-array->numcl-array *test-array*)) ;; to numcl array
-
-(pyscp.stats:relfreq :a *test-array-numcl* :numbins 20 )
-
+(defparameter *test-array-numcl* (simple-array->numcl-array *test-array*))
 
 (defun numcl-array->lispstat-column (numcl-array)
   (assert (numcl:numcl-array-p numcl-array) () "Must be a numcl-array")
@@ -748,38 +747,43 @@ funs: a list of symbols which are callable functions, each of which takes the ar
     made
     ))
 
+(defun def-histogram (title subtitle xtitle ytitle bins 2d-numcl-array)
+  (let (
+        (values (numcl-array->lispstat-column 2d-numcl-array))
+        )
+    (vega:defplot test-plot
+      `(:title (:text ,title
+                :subtitle ,subtitle)
+        :width 400
+        :height 400
+        :data (:values ,values)
+        :mark (:type :bar)
+        :encoding (:x (
+                       :title ,xtitle
+                       :field :unnamed
+                       :bin (:maxbins ,bins)
+                       )
+                   :y (
+                       :title ,ytitle
+                       :aggregate :count
+                       ))))
+    ))
 
-(defparameter *test-ls-col* (numcl-array->lispstat-column *test-array-numcl*))
+(initialize-outputs)
 
-(defparameter *test-plot*
-  (vega:defplot test-plot
-    `(
-      :title (:text "Main Title"
-              :subtitle "subtitle")
-      :width 400
-      :height 400
-      :data (:values ,*test-ls-col*)
-      :mark (:type :bar :tooltip t)
-      ;; :transform #()
-      :encoding (:x (
-                     :title "X title"
-                     :field :unnamed
-                     :bin (:maxbins 8)
-                     )
-                 :y (
-                     :title "Y title"
-                     :aggregate :count
-                     )))))
+(defparameter *test-plot* (def-histogram "MainTitle" "subtitle of luxury" "x bins" "count" 10 *test-array-numcl*))
 
 (plot:plot *test-plot*)
 
-(uiop:file-pathname-p #P"~/tempdata/testop/bar.html")
-(vega:write-html *test-plot* #P"/home/holdens/tempdata/testop/bar.html")
+(defparameter *test-plot-filename* (filepaths:join *plots-path* "bar.html"))
+(defun compose-name (experiment-dictionary &key specifier path filetype)) ; &&& builds up a namestring
 
-(plot:plot-from-file #P"~/tempdata/testop/bar.html" :browser :firefox)
+(uiop:file-pathname-p *test-plot-filename*)
+(vega:write-html *test-plot* *test-plot-filename*)
+(defun save-vega-html (plot-spec)) ; &&& builds name tests name and writes
 
-
-
+(plot:plot-from-file *test-plot-filename* :browser :firefox)
+(defun plot-all-vega (path)) ; &&& gets and filters files mapcar plot-from-file
 
 ;;;; ==================================== reference
 
