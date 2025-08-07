@@ -629,6 +629,8 @@
 
 ;;;; ==================================== build
 
+;;;; run single experiment
+
 (defun call-funs-on-args (funs args)
   " Funcall all the funs on an args dictionary
 args: a plist of args which will be passed into each of the called funs
@@ -645,6 +647,7 @@ funs: a list of symbols which are callable functions, each of which takes the ar
               l1 l2)))
 
 (defun spoof-test-1 (arguments)
+  "&&& temp"
   (let* (
          (res (format nil "~A ~A ~A"
                       (gat arguments :a1)
@@ -659,6 +662,7 @@ funs: a list of symbols which are callable functions, each of which takes the ar
     ))
 
 (defun spoof-test-2 (arguments)
+  "&&& temp"
   (let* (
          (res (format nil "~A ~A ~A"
                       (gat arguments :a1)
@@ -673,7 +677,7 @@ funs: a list of symbols which are callable functions, each of which takes the ar
     ))
 
 (defun run-single-reports (experiments &optional show)
-  "Adds the single report stats to each experiment dictionary"
+  "Calls plotting and reporting functions on each experiment, adds the single report stats to each experiment dictionary"
   (when show (format t "~&~%In: run single reports"))
   (labels (
            (run-experiment (experiment)
@@ -712,25 +716,10 @@ funs: a list of symbols which are callable functions, each of which takes the ar
       completed-experiments
       )))
 
-(run-single-reports *test-experiments* t)
-
-;;;; ==================================== scratch
-
-(defparameter *test-experiments* '((:FILES (:TRUE #P"/home/holdens/tempdata/predictions1percent/tiffs/HEIGHT-CM.tiff" :PRED-0 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_HEIGHT-CM_regression_GBM.tiff" :PRED-1 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_HEIGHT-CM_regression_TSAI.tiff" :GPKG #P"/home/holdens/tempdata/predictions1percent/gpkgs/AOI-south.gpkg" :TABLE #P"/home/holdens/tempdata/predictions1percent/tables/temp-table.csv") :TRAIT ("HEIGHT-CM") :OBJECTIVE ("regression") :MODELS ("GBM" "TSAI") :TESTS (STAT-REG-DESCRIBE-TRUE-HISTO STAT-REG-DESCRIBE-TRUE-MEAN STAT-REG-DESCRIBE-PRED-HISTO STAT-REG-DESCRIBE-PRED-MEAN STAT-REG-COMPARE-PRED-R2 STAT-REG-COMPARE-PRED-RESIDUAL) :META-TESTS (META-STAT-REG-COMPARE-MODELS-ANOVA)) (:FILES (:TRUE #P"/home/holdens/tempdata/predictions1percent/tiffs/BARLEY-WHEAT.tiff" :PRED-0 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_BARLEY-WHEAT_multiclass_GBM.tiff" :PRED-1 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_BARLEY-WHEAT_multiclass_TSAI.tiff" :GPKG #P"/home/holdens/tempdata/predictions1percent/gpkgs/AOI-south.gpkg" :TABLE #P"/home/holdens/tempdata/predictions1percent/tables/temp-table.csv") :TRAIT ("BARLEY-WHEAT") :OBJECTIVE ("multiclass") :MODELS ("GBM" "TSAI") :TESTS (STAT-CAT-DESCRIBE-TRUE-BARCHART STAT-CAT-DESCRIBE-PRED-BARCHART STAT-CAT-COMPARE-PRED-F1 STAT-CAT-COMPARE-PRED-CONFUSIONMX) :META-TESTS (META-STAT-CAT-COMPARE-MODELS-ANOVA))))
-
-(defparameter *test-experiment* (first *test-experiments*))
-
-;; 3x3 1-9
-(defparameter *test-array* (make-array '(3 3) :initial-contents '((1.0 2.0 3.0) (4.0 5.0 6.0) (7.0 8.0 9.0)) :element-type 'single-float))
-;; 100x100 all 100
-(defparameter *test-array* (make-array '(100 100) :initial-element 100.0 :element-type 'single-float))
-;; 50x20 0-9999
-(defparameter *test-array* (numcl:reshape (numcl:arange 0 1000) '(50 -1)))
+;;;; vega plot utilities
 
 (defun simple-array->numcl-array (simple-array)
   (numcl:asarray simple-array))
-
-(defparameter *test-array-numcl* (simple-array->numcl-array *test-array*))
 
 (defun numcl-array->lispstat-column (numcl-array)
   (assert (numcl:numcl-array-p numcl-array) () "Must be a numcl-array")
@@ -769,22 +758,66 @@ funs: a list of symbols which are callable functions, each of which takes the ar
                        ))))
     ))
 
-(initialize-outputs)
-
-(defparameter *test-plot* (def-histogram "MainTitle" "subtitle of luxury" "x bins" "count" 10 *test-array-numcl*))
-
-(plot:plot *test-plot*)
-
-(defparameter *test-plot-filename* (filepaths:join *plots-path* "bar.html"))
 (defun compose-name (experiment-dictionary &key specifier path filetype)) ; &&& builds up a namestring
 
-(uiop:file-pathname-p *test-plot-filename*)
-(vega:write-html *test-plot* *test-plot-filename*)
-(defun save-vega-html (plot-spec)) ; &&& builds name tests name and writes
+(defun save-vega-html (plot-spec filename)
+  "tests filename and writes plot-spec to disk as html"
+  (print filename)
+  (let* (
+         (fn-test-html (string= "html"
+                                (pathname-type filename)))
+         (fn-test-file (uiop:file-pathname-p filename))
+         (fn-tested (and fn-test-file fn-test-html))
+         )
+    (assert fn-tested ()
+            "The filename argument must represent a path to an html file. Received: ~S"
+            filename)
+    (vega:write-html plot-spec fn-test-file)))
 
+(defun plot-all-vega (path &key (save-mode nil))
+  "lists and filters html files , mapcar plot-from-file,
+   or save mode t  present 1 at a time print the filename with .png postfixed for convenient saving
+on user input go to next plot or quit")
+
+
+
+;;;; ==================================== scratch
+
+(uiop:file-pathname-p "/hom")
+
+;; 3x3 1-9
+(defparameter *test-array* (make-array '(3 3) :initial-contents '((1.0 2.0 3.0) (4.0 5.0 6.0) (7.0 8.0 9.0)) :element-type 'single-float))
+;; 100x100 all 100
+(defparameter *test-array* (make-array '(100 100) :initial-element 100.0 :element-type 'single-float))
+;; 50x20 0-9999
+(defparameter *test-array* (numcl:reshape (numcl:arange 0 1000) '(50 -1)))
+;; converted to numcl
+(defparameter *test-array-numcl* (simple-array->numcl-array *test-array*))
+
+(initialize-outputs) ;; clean up before testing output functions
+
+;; vega plot spec
+(defparameter *test-plot* (def-histogram "MainTitle" "Luxurious sub title" "binned values" "frequency" 100 *test-array-numcl*))
+;; check current plot spec
+(plot:plot *test-plot*)
+
+;; placeholder for name making function
+(defparameter *test-plot-filename* (filepaths:join *plots-path* "bar.html"))
+
+(save-vega-html *test-plot* *test-plot-filename*)
+
+;; placeholder for plot from html function
 (plot:plot-from-file *test-plot-filename* :browser :firefox)
-(defun plot-all-vega (path)) ; &&& gets and filters files mapcar plot-from-file
 
+
+
+;;;;
+
+(run-single-reports *test-experiments* t)
+
+(defparameter *test-experiments* '((:FILES (:TRUE #P"/home/holdens/tempdata/predictions1percent/tiffs/HEIGHT-CM.tiff" :PRED-0 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_HEIGHT-CM_regression_GBM.tiff" :PRED-1 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_HEIGHT-CM_regression_TSAI.tiff" :GPKG #P"/home/holdens/tempdata/predictions1percent/gpkgs/AOI-south.gpkg" :TABLE #P"/home/holdens/tempdata/predictions1percent/tables/temp-table.csv") :TRAIT ("HEIGHT-CM") :OBJECTIVE ("regression") :MODELS ("GBM" "TSAI") :TESTS (STAT-REG-DESCRIBE-TRUE-HISTO STAT-REG-DESCRIBE-TRUE-MEAN STAT-REG-DESCRIBE-PRED-HISTO STAT-REG-DESCRIBE-PRED-MEAN STAT-REG-COMPARE-PRED-R2 STAT-REG-COMPARE-PRED-RESIDUAL) :META-TESTS (META-STAT-REG-COMPARE-MODELS-ANOVA)) (:FILES (:TRUE #P"/home/holdens/tempdata/predictions1percent/tiffs/BARLEY-WHEAT.tiff" :PRED-0 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_BARLEY-WHEAT_multiclass_GBM.tiff" :PRED-1 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_BARLEY-WHEAT_multiclass_TSAI.tiff" :GPKG #P"/home/holdens/tempdata/predictions1percent/gpkgs/AOI-south.gpkg" :TABLE #P"/home/holdens/tempdata/predictions1percent/tables/temp-table.csv") :TRAIT ("BARLEY-WHEAT") :OBJECTIVE ("multiclass") :MODELS ("GBM" "TSAI") :TESTS (STAT-CAT-DESCRIBE-TRUE-BARCHART STAT-CAT-DESCRIBE-PRED-BARCHART STAT-CAT-COMPARE-PRED-F1 STAT-CAT-COMPARE-PRED-CONFUSIONMX) :META-TESTS (META-STAT-CAT-COMPARE-MODELS-ANOVA))))
+
+(defparameter *test-experiment* (first *test-experiments*))
 ;;;; ==================================== reference
 
 ;; numcl has mean
