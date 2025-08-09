@@ -158,15 +158,15 @@
 (defparameter *program-root* #P"/home/holdens/tempdata/predictions1percent/"
               "Pathname to a dir containing the dirs specified below" )
 
-(defparameter *input-path* (filepaths:join *program-root* "input"))
+(defparameter *input-path* (filepaths:parent (filepaths:join *program-root* "input" "X")))
 ;; &&& ensure input exists
 
-(defparameter *tiffs-path* (filepaths:join *input-path* "tiffs")
+(defparameter *tiffs-path* (filepaths:parent (filepaths:join *input-path* "tiffs" "X"))
   "string of the dir in the input-root containing all tiff files. mandatory naming format:<TRAIT>.tiff OR PREDICTED_<TRAIT>_<objective>_<MODEL>.tiff")
 
-(defparameter *gpkgs-path* (filepaths:join *input-path* "gpkgs"))
+(defparameter *gpkgs-path* (filepaths:parent (filepaths:join *input-path* "gpkgs" "X")))
 
-(defparameter *tables-path* (filepaths:join *input-path* "tables"))
+(defparameter *tables-path* (filepaths:parent (filepaths:join *input-path* "tables" "X")))
 
 (defparameter *area-geopackage* (filepaths:join *gpkgs-path* "AOI-south.gpkg"))
 
@@ -176,11 +176,11 @@
 (defparameter *geotiff-extension* "tiff"
   "file extension used for the geotiff files. one of \"tif\" or \"tiff\" (no dot) ")
 
-(defparameter *output-root* (filepaths:join *program-root*  "output"))
+(defparameter *output-root* (filepaths:parent (filepaths:join *program-root*  "output" "X")))
 
-(defparameter *plots-path*  (filepaths:join *output-root* "plots"))
+(defparameter *plots-path*  (filepaths:parent (filepaths:join *output-root* "plots" "X")))
 
-(defparameter *reports-path* (filepaths:join *output-root* "reports"))
+(defparameter *reports-path* (filepaths:parent (filepaths:join *output-root* "reports" "X")))
 
 (defparameter *report* (filepaths:join *reports-path* "report.txt"))
 
@@ -612,8 +612,8 @@
         ))))
 
 (defun coordinate-reports (experiments &optional show)
-  "Calls phases of report making"
-  (when show (format t "~&~% In: coordinate reports &&& incomplete."))
+  "&&& Calls phases of report making"
+  (when show (format t "~&~% In: coordinate reports."))
   (-<>
       (run-single-reports experiments show)
     ;; (run-meta-reports <> show)
@@ -621,22 +621,47 @@
     ;; &&& maybe emit something to be returned to call-all-reports at the end
     ))
 
-;;;; ==================================== API
+(defun compose-name (experiment &key specifier path filetype)
+  "Builds up a namestring returing string if just experiment and specifier supplied, pathname if path or filetype supplied"
+  (assert (gat experiment :selected-test)() "The experiment dictionary must have a selected test")
+  (assert (gat experiment :selected-model)() "The experiment dictionary must have a selected model")
+  (let* (
+         ;; pull apart experiment dictionary
+         (model (gat experiment :selected-model))
+         (trait (first (gat experiment :trait)))
+         (objective (first (gat experiment :objective)))
+         (test (gat experiment :selected-test))
+         ;; assemble name base
+         (base-name (format nil "~A_~A_~A_~A" model trait objective test))
+         ;; conditionally postfix specifier
+         (specifier-added (when specifier
+                            (format nil "~A_~A" base-name specifier)))
+         ;; conditionally postfix filetype
+         (type-added (when filetype
+                       (make-pathname :type filetype
+                                      :name (or specifier-added
+                                                base-name))))
+         ;; conditionaly prefix path
+         (path-added (when path
+                       (make-pathname :directory (pathname-directory path)
+                                      :name (or specifier-added
+                                                base-name)
+                                      :defaults type-added)))
+         ;; responsively select return type by taking first non nil
+         (return-selection (or path-added
+                               type-added
+                               specifier-added
+                               base-name))
+         )
+    return-selection
+    ))
 
-(run-all-reports :show t)
-
-;;;; ==================================== FIN
-
-;;;; ==================================== build
-
-;;;; run single experiment
-
-(defun call-funs-on-args (funs args)
+(defun call-funs-on-args (funs args experiment)
   " Funcall all the funs on an args dictionary
 args: a plist of args which will be passed into each of the called funs
 funs: a list of symbols which are callable functions, each of which takes the args plist and returns a results plist"
   (mapcar (lambda (func)
-            (funcall func args))
+            (funcall func args (sat func experiment :selected-test)))
           funs))
 
 (defun interleave (l1 l2)
@@ -645,78 +670,6 @@ funs: a list of symbols which are callable functions, each of which takes the ar
          (map 'list
               (lambda (k v) (list k v))
               l1 l2)))
-
-(defun spoof-test-1 (arguments)
-  "&&& temp"
-  (let* (
-         (res (format nil "~A ~A ~A"
-                      (gat arguments :a1)
-                      (gat arguments :a2)
-                      (gat arguments :a3)))
-         (id "test-1")
-         (ret-dict (list
-                    :message res
-                    :from id))
-         )
-    ret-dict
-    ))
-
-(defun spoof-test-2 (arguments)
-  "&&& temp"
-  (let* (
-         (res (format nil "~A ~A ~A"
-                      (gat arguments :a1)
-                      "even smoller"
-                      (gat arguments :a3)))
-         (id "test-2")
-         (ret-dict (list
-                    :message res
-                    :from id))
-         )
-    ret-dict
-    ))
-
-(defun run-single-reports (experiments &optional show)
-  "Calls plotting and reporting functions on each experiment, adds the single report stats to each experiment dictionary"
-  (when show (format t "~&~%In: run single reports"))
-  (labels (
-           (run-experiment (experiment)
-             (let* (
-                    ;; real values
-                    (tests (gat experiment :tests))
-                    (files (gat experiment :files))
-                    ;; &&& spoof values
-                    (tests '(spoof-test-1 spoof-test-2))
-                    (arguments '(:A1 "hello" :A2 "smol" :A3 "frog"))
-                    ;; open files
-                    ;; create arrays
-                    ;; manipulate arrays
-                    ;; make an arguments plist
-                    ;; use the preamble
-                    (result-dicts (call-funs-on-args tests arguments))
-                    ;; close files
-                    ;; re compose the result-maps
-                    (keyed-result-dicts (interleave (mapcar #'symbol->keyword tests) result-dicts))
-                    ;; compose the return dict
-                    (completed-experiment (sat keyed-result-dicts experiment :results))
-                    )
-               ;; (print "check prints")
-               ;; (print keyed-result-dicts)
-               ;; (print completed-experiment)
-               ;; return value
-               completed-experiment
-               ))
-           ;; other label funs
-           (symbol->keyword (sym) (intern (symbol-name sym) :keyword))
-           )
-    (let* (
-           (completed-experiments (mapcar #'run-experiment experiments))
-           )
-      (when show (format t "~&Returning: ~S" completed-experiments))
-      completed-experiments
-      )))
-
-;;;; vega plot utilities
 
 (defun simple-array->numcl-array (simple-array)
   (numcl:asarray simple-array))
@@ -736,7 +689,184 @@ funs: a list of symbols which are callable functions, each of which takes the ar
     made
     ))
 
-(defun def-histogram (title subtitle xtitle ytitle bins 2d-numcl-array)
+(defun save-vega-html (plot-spec filename)
+  "tests filename and writes plot-spec to disk as html"
+  (let* (
+         (fn-test-html (string= "html"
+                                (pathname-type filename)))
+         (fn-test-file (uiop:file-pathname-p filename))
+         (fn-tested (and fn-test-file fn-test-html))
+         )
+    (assert fn-tested ()
+            "The filename argument must represent a path to an html file. Received: ~S"
+            filename)
+    (vega:write-html plot-spec fn-test-file)))
+;;;; ==================================== API
+
+#+X(
+    (run-all-reports :show t)
+    )
+
+;;;; ==================================== FIN
+
+;;;; ==================================== build
+
+;;;; run single experiment
+
+(defun experiment-x-models (experiment models)
+                     "Repeats experiment dictionary by length of models, adding :selected-model"
+                     (mapcar
+                      #'(lambda (model)
+                          (sat model experiment :selected-model)
+                          )
+                      models))
+
+(defun argument-x-models (arguments picked-model-experiments)
+  "&&& repeats arguments by length of experiments
+uses :selected-model to filter files"
+                   (labels (
+                            (get-models (experiment) (gat experiment :selected-model))
+                            (filter-arguments (model) ) ; &&&
+                            ;;selected-array-0
+                            )
+                     (let* (
+                            (selected-models (mapcar #'get-models picked-model-experiments) )
+                            (filtered-arguments (mapcar #'filter-arguments selected-models))
+                            )
+                       )))
+
+(defun spoof-test-1 (arguments experiment)
+  "&&& temp histogram caller"
+  (labels (
+           (run-job (experiment arguments id)
+             (let* (
+                    (subtitle (compose-name experiment :specifier id))
+                    (2d-numcl-array (gat arguments :selected-array-0))
+                    (plot-spec (def-histogram
+                                   "Histogram of Raster Values"
+                                 subtitle
+                                 "values"
+                                 "frequency"
+                                 2d-numcl-array))
+                    (filename (compose-name experiment
+                                            :specifier id
+                                            :path *plots-path*
+                                            :filetype "html"))
+                    (saved (save-vega-html plot-spec filename))
+                    (ret-dict (list :output saved))
+                    )
+               ret-dict
+               ))
+           ;; other labels
+           )
+    (let* (
+           ;; select model and files
+           (id (gat experiment :selected-test))
+           (models (gat experiment :models))
+           (picked-model-experiments (experiment-x-models experiment models ))
+           (picked-model-arguments (arguments-x-models arguments picked-model-experiments))
+           (job-results (map #'run-job
+                             picked-model-experiments
+                             picked-model-arguments
+                             (constantly id)))
+           (result-dict (interleave (mapcar #'symbol->keyword models)
+                                    job-results))
+         )
+    result-dict
+    )))
+
+
+(defun spoof-test-2 (arguments experiment)
+  "&&& temp"
+  (let* (
+         (res (format nil "~A ~A ~A ~A ~A"
+                      (gat arguments :a1)
+                      "even smoller"
+                      (gat experiment :selected-test)
+                      (gat experiment :selected-test)
+                      (gat experiment :selected-model)
+                      ))
+         (id "test-2")
+         (ret-dict (list
+                    :message res
+                    :from id))
+         )
+    ret-dict
+    ))
+
+(defun symbol->keyword (sym)
+  (intern (symbol-name sym) :keyword))
+
+
+#+X(
+
+    (:TRUE #P"/home/holdens/tempdata/predictions1percent/tiffs/HEIGHT-CM.tiff"
+     :PRED-0 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_HEIGHT-CM_regression_GBM.tiff"
+     :PRED-1 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_HEIGHT-CM_regression_TSAI.tiff"
+     :GPKG #P"/home/holdens/tempdata/predictions1percent/gpkgs/AOI-south.gpkg" :TABLE #P"/home/holdens/tempdata/predictions1percent/tables/temp-table.csv")
+
+    )
+
+(defun run-single-reports (experiments &optional show)
+  "Calls plotting and reporting functions on each experiment, adds the single report stats to each experiment dictionary"
+  (when show (format t "~&~%In: run single reports"))
+  (labels (
+           (run-experiment (experiment)
+             (let* (
+                    ;; real values
+                    (tests (gat experiment :tests))
+                    (files (gat experiment :files))
+                    ;; open files
+                    (true-obj (open-geotiff (gat files :true)))
+                    (pred-0-obj (open-geotiff (gat files :pred-0)))
+                    (pred-1-obj (open-geotiff (gat files :pred-1)))
+                    (gpgk-obj (open-geopackage (gat files :gpkg)))
+                    ;; create arrays
+                    (true (simple-array->numcl-array (py:pymethod true-obj "read" 1)))
+                    (pred-0 (simple-array->numcl-array (py:pymethod pred-0-obj "read" 1)))
+                    (pred-1 (simple-array->numcl-array (py:pymethod pred-1-obj "read" 1)))
+                    ;; &&& manipulate arrays
+                    ;; &&& D-pred-0
+                    ;; &&& D-pred-1
+                    ;; &&&
+                    ;; &&&
+                    ;; &&& make an arguments plist
+                    ;; &&& spoof values
+                    (tests '(spoof-test-1))
+                    (arguments '(:A1 "hello" :A2 "smol" :A3 "frog"))
+                    ;; use the preamble
+                    (result-dicts (call-funs-on-args tests arguments experiment))
+                    ;; close files
+                    (true-closed (py:pymethod true-obj 'close))
+                    (pred-0-closed (py:pymethod pred-0-obj 'close))
+                    (pred-1-closed (py:pymethod pred-1-obj 'close))
+                    ;; re compose the result-maps
+                    (keyed-result-dicts (interleave (mapcar #'symbol->keyword tests)
+                                                    result-dicts))
+                    ;; compose the return dict
+                    (completed-experiment (sat keyed-result-dicts experiment :results))
+                    )
+               ;; (print "check prints")
+               ;; (print keyed-result-dicts)
+               ;; (print completed-experiment)
+               ;; return value
+               completed-experiment
+               ))
+           ;; other label funs
+           )
+    (let* (
+           (completed-experiments (mapcar #'run-experiment experiments))
+           )
+      (when show (format t "~&Returning: ~S" completed-experiments))
+      completed-experiments
+      )))
+#+X(
+    (run-single-reports *test-experiments* t)
+    )
+
+;;;; vega plot utilities
+
+(defun def-histogram (title subtitle xtitle ytitle 2d-numcl-array &key (bins 100))
   (let (
         (values (numcl-array->lispstat-column 2d-numcl-array))
         )
@@ -758,232 +888,278 @@ funs: a list of symbols which are callable functions, each of which takes the ar
                        ))))
     ))
 
-(defun compose-name (experiment-dictionary &key specifier path filetype)) ; &&& builds up a namestring
-
-(defun save-vega-html (plot-spec filename)
-  "tests filename and writes plot-spec to disk as html"
-  (print filename)
-  (let* (
-         (fn-test-html (string= "html"
-                                (pathname-type filename)))
-         (fn-test-file (uiop:file-pathname-p filename))
-         (fn-tested (and fn-test-file fn-test-html))
-         )
-    (assert fn-tested ()
-            "The filename argument must represent a path to an html file. Received: ~S"
-            filename)
-    (vega:write-html plot-spec fn-test-file)))
-
 (defun plot-all-vega (path &key (save-mode nil))
-  "lists and filters html files , mapcar plot-from-file,
+  "TODO lists and filters html files , mapcar plot-from-file,
    or save mode t  present 1 at a time print the filename with .png postfixed for convenient saving
 on user input go to next plot or quit")
 
 
 
+(defun where-agree (array test &key array-alt where)
+  (assert (or (and array (not where)) (and (not array) where))() "Use one of array or where")
+  (labels (
+           (where->coords (where)
+             (map 'list #'zip (first where) (second where)))
+           (zip (a b) (list a b))
+           (coords->where (coords)
+             (list (mapcar #'first coords) (mapcar #'second coords)))
+           )
+    (let* (
+           (where-array-0 (numcl:where array test))
+           (where-array-alt (when array-alt (numcl:where array-alt test)))
+           (where-array-1 (or where-array-alt where))
+           ;; where to coordinate for intersection
+           (array-0-zip (where->coords where-array-0))
+           (array-1-zip (where->coords where-array-1))
+           (agreement-zipped (intersection array-0-zip array-1-zip :test 'equal))
+           ;; coordinate to where
+           (agreement-where (coords->where agreement-zipped))
+           )
+      (print where-array-0)
+      (print where-array-1)
+      (print array-0-zip)
+      (print array-1-zip)
+      agreement-where
+      )))
+
+(where-agree *test-array* #'null :array-alt *test-subtr-array*)
+(where-agree *test-array* (complement #'null) :array-alt *test-subtr-array*)
+
+
+
 ;;;; ==================================== scratch
 
-(uiop:file-pathname-p "/hom")
+#+X(
+    => (:FILES (:TRUE #P"/home/holdens/tempdata/predictions1percent/tiffs/HEIGHT-CM.tiff" :PRED-0 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_HEIGHT-CM_regression_GBM.tiff" :PRED-1 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_HEIGHT-CM_regression_TSAI.tiff" :GPKG #P"/home/holdens/tempdata/predictions1percent/gpkgs/AOI-south.gpkg" :TABLE #P"/home/holdens/tempdata/predictions1percent/tables/temp-table.csv") :TRAIT ("HEIGHT-CM") :OBJECTIVE ("regression") :MODELS ("GBM" "TSAI") :TESTS (STAT-REG-DESCRIBE-TRUE-HISTO STAT-REG-DESCRIBE-TRUE-MEAN STAT-REG-DESCRIBE-PRED-HISTO STAT-REG-DESCRIBE-PRED-MEAN STAT-REG-COMPARE-PRED-R2 STAT-REG-COMPARE-PRED-RESIDUAL) :META-TESTS (META-STAT-REG-COMPARE-MODELS-ANOVA))
+    )
 
-;; 3x3 1-9
-(defparameter *test-array* (make-array '(3 3) :initial-contents '((1.0 2.0 3.0) (4.0 5.0 6.0) (7.0 8.0 9.0)) :element-type 'single-float))
-;; 100x100 all 100
-(defparameter *test-array* (make-array '(100 100) :initial-element 100.0 :element-type 'single-float))
-;; 50x20 0-9999
-(defparameter *test-array* (numcl:reshape (numcl:arange 0 1000) '(50 -1)))
-;; converted to numcl
-(defparameter *test-array-numcl* (simple-array->numcl-array *test-array*))
+#+X(
 
-(initialize-outputs) ;; clean up before testing output functions
+    (numcl:- *test-array* *test-subtr-array*)
+    (numcl:take *test-subtr-array* (numcl:where *test-subtr-array* #'null))
+    (numcl:where *test-subtr-array* (complement #'null))
+    (numcl:where *test-array* (complement #'null))
 
-;; vega plot spec
-(defparameter *test-plot* (def-histogram "MainTitle" "Luxurious sub title" "binned values" "frequency" 100 *test-array-numcl*))
-;; check current plot spec
-(plot:plot *test-plot*)
+    (numcl:take *test-array* '((0 1 2 0 0 1 1 2) (2 1 2 0 1 0 2 2)))
 
-;; placeholder for name making function
-(defparameter *test-plot-filename* (filepaths:join *plots-path* "bar.html"))
+    (defparameter *test-subtr-array* (simple-array->numcl-array *test-subtr-array*))
+    (defparameter *test-array* (simple-array->numcl-array *test-array*))
 
-(save-vega-html *test-plot* *test-plot-filename*)
+    (defparameter *test-subtr-array* (make-array '(3 3) :initial-contents
+                                                 '((nil nil 1.0) (nil 1.0 nil) (1.0 1.0 nil)) ))
+    (defparameter *test-array* (make-array '(3 3) :initial-contents
+                                                 '((1.0 2.0 nil) (4.0 nil 6.0) (7.0 8.0 nil)) ))
 
-;; placeholder for plot from html function
-(plot:plot-from-file *test-plot-filename* :browser :firefox)
+    (defparameter *test-subtr-array* (make-array '(3 3) :initial-contents '((1.0 1.0 1.0) (1.0 1.0 1.0) (1.0 1.0 1.0)) :element-type 'single-float))
+    ;; 3x3 1-9
+    (defparameter *test-array* (make-array '(3 3) :initial-contents '((1.0 2.0 3.0) (4.0 5.0 6.0) (7.0 8.0 9.0)) :element-type 'single-float))
+
+    ;; 100x100 all 100
+    (defparameter *test-array* (make-array '(100 100) :initial-element 100.0 :element-type 'single-float))
+    ;; 50x20 0-9999
+    (defparameter *test-array* (numcl:reshape (numcl:arange 0 1000) '(50 -1)))
+    ;; converted to numcl
+    (defparameter *test-array-numcl* (simple-array->numcl-array *test-array*))
+
+    (initialize-outputs) ;; clean up before testing output functions
+
+    ;; vega plot spec
+    (defparameter *test-plot* (def-histogram "MainTitle" "Luxurious sub title" "binned values" "frequency" 100 *test-array-numcl*))
+    ;; check current plot spec
+    (plot:plot *test-plot*)
+
+    ;; placeholder for name making function
+    (defparameter *test-plot-filename* (filepaths:join *plots-path* "bar.html"))
+
+    (save-vega-html *test-plot* *test-plot-filename*)
+
+    ;; placeholder for plot from html function
+    (plot:plot-from-file *test-plot-filename* :browser :firefox)
 
 
 
 ;;;;
 
-(run-single-reports *test-experiments* t)
 
-(defparameter *test-experiments* '((:FILES (:TRUE #P"/home/holdens/tempdata/predictions1percent/tiffs/HEIGHT-CM.tiff" :PRED-0 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_HEIGHT-CM_regression_GBM.tiff" :PRED-1 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_HEIGHT-CM_regression_TSAI.tiff" :GPKG #P"/home/holdens/tempdata/predictions1percent/gpkgs/AOI-south.gpkg" :TABLE #P"/home/holdens/tempdata/predictions1percent/tables/temp-table.csv") :TRAIT ("HEIGHT-CM") :OBJECTIVE ("regression") :MODELS ("GBM" "TSAI") :TESTS (STAT-REG-DESCRIBE-TRUE-HISTO STAT-REG-DESCRIBE-TRUE-MEAN STAT-REG-DESCRIBE-PRED-HISTO STAT-REG-DESCRIBE-PRED-MEAN STAT-REG-COMPARE-PRED-R2 STAT-REG-COMPARE-PRED-RESIDUAL) :META-TESTS (META-STAT-REG-COMPARE-MODELS-ANOVA)) (:FILES (:TRUE #P"/home/holdens/tempdata/predictions1percent/tiffs/BARLEY-WHEAT.tiff" :PRED-0 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_BARLEY-WHEAT_multiclass_GBM.tiff" :PRED-1 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_BARLEY-WHEAT_multiclass_TSAI.tiff" :GPKG #P"/home/holdens/tempdata/predictions1percent/gpkgs/AOI-south.gpkg" :TABLE #P"/home/holdens/tempdata/predictions1percent/tables/temp-table.csv") :TRAIT ("BARLEY-WHEAT") :OBJECTIVE ("multiclass") :MODELS ("GBM" "TSAI") :TESTS (STAT-CAT-DESCRIBE-TRUE-BARCHART STAT-CAT-DESCRIBE-PRED-BARCHART STAT-CAT-COMPARE-PRED-F1 STAT-CAT-COMPARE-PRED-CONFUSIONMX) :META-TESTS (META-STAT-CAT-COMPARE-MODELS-ANOVA))))
+    (defparameter *test-experiments* '((:FILES (:TRUE #P"/home/holdens/tempdata/predictions1percent/tiffs/HEIGHT-CM.tiff" :PRED-0 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_HEIGHT-CM_regression_GBM.tiff" :PRED-1 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_HEIGHT-CM_regression_TSAI.tiff" :GPKG #P"/home/holdens/tempdata/predictions1percent/gpkgs/AOI-south.gpkg" :TABLE #P"/home/holdens/tempdata/predictions1percent/tables/temp-table.csv") :TRAIT ("HEIGHT-CM") :OBJECTIVE ("regression") :MODELS ("GBM" "TSAI") :TESTS (STAT-REG-DESCRIBE-TRUE-HISTO STAT-REG-DESCRIBE-TRUE-MEAN STAT-REG-DESCRIBE-PRED-HISTO STAT-REG-DESCRIBE-PRED-MEAN STAT-REG-COMPARE-PRED-R2 STAT-REG-COMPARE-PRED-RESIDUAL) :META-TESTS (META-STAT-REG-COMPARE-MODELS-ANOVA)) (:FILES (:TRUE #P"/home/holdens/tempdata/predictions1percent/tiffs/BARLEY-WHEAT.tiff" :PRED-0 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_BARLEY-WHEAT_multiclass_GBM.tiff" :PRED-1 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_BARLEY-WHEAT_multiclass_TSAI.tiff" :GPKG #P"/home/holdens/tempdata/predictions1percent/gpkgs/AOI-south.gpkg" :TABLE #P"/home/holdens/tempdata/predictions1percent/tables/temp-table.csv") :TRAIT ("BARLEY-WHEAT") :OBJECTIVE ("multiclass") :MODELS ("GBM" "TSAI") :TESTS (STAT-CAT-DESCRIBE-TRUE-BARCHART STAT-CAT-DESCRIBE-PRED-BARCHART STAT-CAT-COMPARE-PRED-F1 STAT-CAT-COMPARE-PRED-CONFUSIONMX) :META-TESTS (META-STAT-CAT-COMPARE-MODELS-ANOVA))))
 
-(defparameter *test-experiment* (first *test-experiments*))
+    (defparameter *test-experiment* (first *test-experiments*))
+
+    );; end no X
+
 ;;;; ==================================== reference
 
-;; numcl has mean
-(numcl:mean *test-array-numcl*)
-;; numcl has standard-deviation
-(numcl:standard-deviation *test-array-numcl*)
-;; 5 num sum is min 25 50 75 max
-(pyscp.stats:describe :a (numcl:flatten *test-array-numcl*))
-(pynpy:percentile :a *test-array-numcl* :q 50)
-;; vvv &&&
-;; lisp-stat has histogram in mark bar
+#+X(
 
-;; lisp-stat has freq,%freq in tabulate
-(lisp-stat:tabulate)
-;; lisp-stat has barchart in mark bar
-;; skl has %correct
-(pyskl.metrics:accuracy-score)
-;; skl has cohens kappa
-(pyskl.metrics:cohen-kappa-score)
-;; skl has jaccard
-(pyskl.metrics:jaccard-score)
-;; lisp-stat has scatter
-;; skl has M2error, rootM2error, MAE,R2
-(pyskl.metrics:mean-squared-error)
-(pyskl.metrics:root-mean-squared-error)
-(pyskl.metrics:mean-absolute-error)
-(pyskl.metrics:r-2-score)
-;; skl has F1 recall precision accuracy
-(pyskl.metrics:f-1-score)
-(pyskl.metrics:recall-score)
-(pyskl.metrics:precision-score)
-(pyskl.metrics:accuracy-score)
-;; skp has confusion matrices
-(pyskp.metrics:confusion-matrix)
-;; pingouin has shapiro wilk test
-(pypin:normality)
-;; pingouin has paired t test
-(pypin:ttest)
-;; pingouin has wilcoxon test
-(pypin:wilcoxon)
-;; pingouin has mcnemars
-(pypin:chi-2-mcnemar)
-;; pingouin has levenes test
-(pypin:homoscedasticity)
-;; pingouin has 1 way anova
-(pypin:anova)
-;; pingouin has kruskal wallis test
-(pypin:kruskal)
-;; pingouin has tukey_hsd test
-(pypin:pairwise-tukey)
-;; pingouin has chi squared test
-(pypin:chi-2-independence)
-;; pingouin has 2 way anova
-(pypin:mixed-anova)
-;; stats models has bowker test
-(pysmsb.stats.runs:symmetry-bowker)
-;; pingouin has false discovery rate adjustment
-(pypin:multicomp)
-;; pingouin has effectsizes
-(pypin:compute-effsize)
+    ;; numcl has mean
+    (numcl:mean *test-array-numcl*)
+    ;; numcl has standard-deviation
+    (numcl:standard-deviation *test-array-numcl*)
+    ;; 5 num sum is min 25 50 75 max
+    (pyscp.stats:describe :a (numcl:flatten *test-array-numcl*))
+    (pynpy:percentile :a *test-array-numcl* :q 50)
+    ;; vvv &&&
+    ;; lisp-stat has histogram in mark bar
+
+    ;; lisp-stat has freq,%freq in tabulate
+    (lisp-stat:tabulate)
+    ;; lisp-stat has barchart in mark bar
+    ;; skl has %correct
+    (pyskl.metrics:accuracy-score)
+    ;; skl has cohens kappa
+    (pyskl.metrics:cohen-kappa-score)
+    ;; skl has jaccard
+    (pyskl.metrics:jaccard-score)
+    ;; lisp-stat has scatter
+    ;; skl has M2error, rootM2error, MAE,R2
+    (pyskl.metrics:mean-squared-error)
+    (pyskl.metrics:root-mean-squared-error)
+    (pyskl.metrics:mean-absolute-error)
+    (pyskl.metrics:r-2-score)
+    ;; skl has F1 recall precision accuracy
+    (pyskl.metrics:f-1-score)
+    (pyskl.metrics:recall-score)
+    (pyskl.metrics:precision-score)
+    (pyskl.metrics:accuracy-score)
+    ;; skp has confusion matrices
+    (pyskp.metrics:confusion-matrix)
+    ;; pingouin has shapiro wilk test
+    (pypin:normality)
+    ;; pingouin has paired t test
+    (pypin:ttest)
+    ;; pingouin has wilcoxon test
+    (pypin:wilcoxon)
+    ;; pingouin has mcnemars
+    (pypin:chi-2-mcnemar)
+    ;; pingouin has levenes test
+    (pypin:homoscedasticity)
+    ;; pingouin has 1 way anova
+    (pypin:anova)
+    ;; pingouin has kruskal wallis test
+    (pypin:kruskal)
+    ;; pingouin has tukey_hsd test
+    (pypin:pairwise-tukey)
+    ;; pingouin has chi squared test
+    (pypin:chi-2-independence)
+    ;; pingouin has 2 way anova
+    (pypin:mixed-anova)
+    ;; stats models has bowker test
+    (pysmsb.stats.runs:symmetry-bowker)
+    ;; pingouin has false discovery rate adjustment
+    (pypin:multicomp)
+    ;; pingouin has effectsizes
+    (pypin:compute-effsize)
+
+    ) ;; end no X
+
+
+#+X(
 
 ;;;; geopandas open gpkg
-(defparameter *geopackage* #P"/home/holdens/tempdata/predictions1percent/gpkgs/AOI-south.gpkg")
-(defparameter *dataset-gpkg* (pygpd:read-file :filename (namestring *geopackage*))) ; read_file handles close
-(print *dataset-gpkg*)
-(py:pyslot-list *dataset-gpkg*)
-(py:pymethod-list *dataset-gpkg*)
+    (defparameter *geopackage* #P"/home/holdens/tempdata/predictions1percent/gpkgs/AOI-south.gpkg")
+    (defparameter *dataset-gpkg* (pygpd:read-file :filename (namestring *geopackage*))) ; read_file handles close
+    (print *dataset-gpkg*)
+    (py:pyslot-list *dataset-gpkg*)
+    (py:pymethod-list *dataset-gpkg*)
 
-(py:pyslot-value *dataset-gpkg* "total_bounds")
-(py:pyslot-value *dataset-gpkg* "crs")
+    (py:pyslot-value *dataset-gpkg* "total_bounds")
+    (py:pyslot-value *dataset-gpkg* "crs")
 
 ;;;; rasterio open tiff
-(defparameter *gtif-true* #P"/home/holdens/tempdata/predictions1percent/tiffs/HEIGHT-CM.tiff")
-;; pythonic: dataset = rasterio.open('some.tif')
-(defparameter *dataset-gtif* (pyrio:open :fp (namestring *gtif-true*))) ; case sensitive!
-(print *dataset-gtif*)
-(py:pyslot-list *dataset-gtif* ) ; ie. show me what data it has
-(py:pymethod-list *dataset-gtif*) ; ie show me what methods it has
+    (defparameter *gtif-true* #P"/home/holdens/tempdata/predictions1percent/tiffs/HEIGHT-CM.tiff")
+    ;; pythonic: dataset = rasterio.open('some.tif')
+    (defparameter *dataset-gtif* (pyrio:open :fp (namestring *gtif-true*))) ; case sensitive!
+    (print *dataset-gtif*)
+    (py:pyslot-list *dataset-gtif* ) ; ie. show me what data it has
+    (py:pymethod-list *dataset-gtif*) ; ie show me what methods it has
 
                                         ; operations on geotiff
 ;;;; slot actions
-;; dataset.bounds
-(py:pyslot-value *dataset-gtif* 'bounds)
-(py:pyslot-value *dataset-gtif* 'bounds.left)
-;; dataset.crs
-(py:pyslot-value *dataset-gtif* 'crs)
-;; dataset.dtypes
-(py:pyslot-value *dataset-gtif* 'dtypes)
-;; dataset.nodata
-(py:pyslot-value *dataset*-gtif 'nodata)
-;; dataset.shape
-(py:pyslot-value *dataset-gtif* 'shape)
+    ;; dataset.bounds
+    (py:pyslot-value *dataset-gtif* 'bounds)
+    (py:pyslot-value *dataset-gtif* 'bounds.left)
+    ;; dataset.crs
+    (py:pyslot-value *dataset-gtif* 'crs)
+    ;; dataset.dtypes
+    (py:pyslot-value *dataset-gtif* 'dtypes)
+    ;; dataset.nodata
+    (py:pyslot-value *dataset*-gtif 'nodata)
+    ;; dataset.shape
+    (py:pyslot-value *dataset-gtif* 'shape)
 
 ;;;; method actions
-(py:pymethod *dataset-gtif* 'get_nodatavals)
-(py:pymethod *dataset-gtif* 'read-crs)
-(py:pymethod *dataset-gtif* 'read-transform)
+    (py:pymethod *dataset-gtif* 'get_nodatavals)
+    (py:pymethod *dataset-gtif* 'read-crs)
+    (py:pymethod *dataset-gtif* 'read-transform)
 
-;; get first band
-;; pythonic: dataset.read(1)
-(py:pymethod *dataset-gtif* "read" 1)
-;; pythonic: read1 = dataset.read(1)
-(defparameter *read1* (py:pymethod *dataset-gtif* "read" 1)) ;; => (SIMPLE-ARRAY SINGLE-FLOAT (1000 26500))
-;; close method when done &&&
-(py:pymethod *dataset-gtif* 'close)
+    ;; get first band
+    ;; pythonic: dataset.read(1)
+    (py:pymethod *dataset-gtif* "read" 1)
+    ;; pythonic: read1 = dataset.read(1)
+    (defparameter *read1* (py:pymethod *dataset-gtif* "read" 1)) ;; => (SIMPLE-ARRAY SINGLE-FLOAT (1000 26500))
+    ;; close method when done &&&
+    (py:pymethod *dataset-gtif* 'close)
 
 ;;;; simple array operations
-(make-array '(2 2))
-(make-array '(2 2) :initial-element nil)
-(make-array '(2 2) :initial-contents '((1 2) (3 4)))
-(type-of (make-array '(2 2) :element-type 'single-float)) ;; => (SIMPLE-ARRAY SINGLE-FLOAT (2 2))
+    (make-array '(2 2))
+    (make-array '(2 2) :initial-element nil)
+    (make-array '(2 2) :initial-contents '((1 2) (3 4)))
+    (type-of (make-array '(2 2) :element-type 'single-float)) ;; => (SIMPLE-ARRAY SINGLE-FLOAT (2 2))
 
-  (defparameter *test-array* (make-array '(2 2) :initial-element 4))
-  (defparameter *test-tens* (make-array '(2 2 2) :initial-element 8))
-  (describe *test-array*)
-  (type-of *test-array*)
+    (defparameter *test-array* (make-array '(2 2) :initial-element 4))
+    (defparameter *test-tens* (make-array '(2 2 2) :initial-element 8))
+    (describe *test-array*)
+    (type-of *test-array*)
 
-  (array-dimensions *test-array*)
-  (aref *test-array* 0 1)
-  (aref *test-tens* 0 0 0)
-  *test-array*
+    (array-dimensions *test-array*)
+    (aref *test-array* 0 1)
+    (aref *test-tens* 0 0 0)
+    *test-array*
 
-  (type-of *read1*) ;; => (SIMPLE-ARRAY SINGLE-FLOAT (1000 26500))
-  (array-dimensions *read1*) ;; => (1000 26500)
-  (array-total-size *read1*) ;; => 26500000 (25 bits, #x1945BA0, #o145055640, #b1100101000101101110100000)
-  (inspect *read1*) ;; works
-  (describe *read1*) ;; works
+    (type-of *read1*) ;; => (SIMPLE-ARRAY SINGLE-FLOAT (1000 26500))
+    (array-dimensions *read1*) ;; => (1000 26500)
+    (array-total-size *read1*) ;; => 26500000 (25 bits, #x1945BA0, #o145055640, #b1100101000101101110100000)
+    (inspect *read1*) ;; works
+    (describe *read1*) ;; works
 
 ;;;; rcl load
 
-  (rcl:r-init)
-  (rcl:r "R.Version")
+    (rcl:r-init)
+    (rcl:r "R.Version")
 
-  ;; cant do this
-  ;; (rcl:r-quit)
-  ;; (rcl:r-init)
+    ;; cant do this
+    ;; (rcl:r-quit)
+    ;; (rcl:r-init)
 
-  ;; (rcl:r "install.packages" "ggplot2")
-  (rcl:r "library" "ggplot2")
-  ;;visualizing categorical data
-  ;; (r:r "install.packages" "vcd")
-  (r:r "library" "vcd")
-  ;; functions for medical statistics book
-  ;; (r:r "install.packages" "fmsb")
-  (r:r "library" "fmsb") ; for Kappa.test
+    ;; (rcl:r "install.packages" "ggplot2")
+    (rcl:r "library" "ggplot2")
+    ;;visualizing categorical data
+    ;; (r:r "install.packages" "vcd")
+    (r:r "library" "vcd")
+    ;; functions for medical statistics book
+    ;; (r:r "install.packages" "fmsb")
+    (r:r "library" "fmsb") ; for Kappa.test
 
-  (rcl:r% "summary" '(1 2 3 4 5 6 7 8 9)) ; pointer
-  (rcl:r "summary" '(1 2 3 4 5 6 7 8 9)) ; alist
-  (rcl:r "print" (rcl:r% "summary" '(1 2 3 4 5 6 7 8 9))) ; print
-  (rcl:r% "print" (rcl:r% "summary" '(1 2 3 4 5 6 7 8 9)))
+    (rcl:r% "summary" '(1 2 3 4 5 6 7 8 9)) ; pointer
+    (rcl:r "summary" '(1 2 3 4 5 6 7 8 9)) ; alist
+    (rcl:r "print" (rcl:r% "summary" '(1 2 3 4 5 6 7 8 9))) ; print
+    (rcl:r% "print" (rcl:r% "summary" '(1 2 3 4 5 6 7 8 9)))
 
-(defparameter *test* '(:a 1 :b 2 :c (:A one)))
-(serapeum:plist-keys *test*)
-(serapeum:plist-values *test*)
+    (defparameter *test* '(:a 1 :b 2 :c (:A one)))
+    (serapeum:plist-keys *test*)
+    (serapeum:plist-values *test*)
 
-(sat "new" *test* :c)
-(sat "new" *test* :c :a)
-(sat "new" *test* :c :b) ; create new b in list
-(sat "new" *test* :c :b '(:new :type :plist)) ; create new nesting
+    (sat "new" *test* :c)
+    (sat "new" *test* :c :a)
+    (sat "new" *test* :c :b) ; create new b in list
+    (sat "new" *test* :c :b '(:new :type :plist)) ; create new nesting
 
-(gat *test* :c)
-(gat *test* :c :a)
-(gat *test* :c :a)
-(gat *test* :c :b) ; nil when nothing there
+    (gat *test* :c)
+    (gat *test* :c :a)
+    (gat *test* :c :a)
+    (gat *test* :c :b) ; nil when nothing there
 
-
+    ) ;; end no X
 #|
 &&&
 |#
