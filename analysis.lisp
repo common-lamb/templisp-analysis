@@ -117,9 +117,13 @@
 
 ;;;; ==================================== package setup
 
+;; check this rather important assumption
+#+X(error () "*features* should not contain 'X' or #+X(MASKED-FORM) will not mask the forms! ")
 ;; set printer to limit depth of large objects
 (setf *print-level* 100)
 (setf *print-length* 100)
+;; set worker threads
+(setf lparallel:*kernel* (lparallel:make-kernel 16))
 
 ;;;; ==================================== python interop setup
                                         ; set config
@@ -701,6 +705,10 @@ funs: a list of symbols which are callable functions, each of which takes the ar
             "The filename argument must represent a path to an html file. Received: ~S"
             filename)
     (vega:write-html plot-spec fn-test-file)))
+
+
+
+
 ;;;; ==================================== API
 
 #+X(
@@ -797,69 +805,171 @@ uses :selected-model to filter files"
 (defun symbol->keyword (sym)
   (intern (symbol-name sym) :keyword))
 
+(defun where-agree (test array &key array-alt where-alt)
+  "finds where 2x 2D arrays agree with a test, the second array may be a previous where result"
+  ;; test xor alt args
+  (assert (or (and array-alt (not where-alt))
+              (and (not array-alt) where-alt))
+          () "Use one of array-alt or where-alt")
+  ;; test if array is 2D
+  (assert (= 2 (length (array-dimensions array)))
+          () "array must be 2D ie. single layered" )
+  ;; test if array-alt is 2D
+  (when array-alt
+    (assert (= 2 (length (array-dimensions array-alt)))
+            () "array-alt must be 2D ie. single layered" ))
+  ;; test if where-alt is 2D ie. 2 equal length lists
+  (when where-alt
+    (assert (and (= 2 (length where-alt))
+                 (= (length (first where-alt))
+                    (length (second where-alt))))
+            () "where-alt must be from a 2D array ie single layered"))
+  (labels (;; convert where lists to 2D points
+           (where->coords (where)
+             (map 'list #'zip (first where) (second where)))
+           ;; makes 1 2D point
+           (zip (a b) (list a b))
+           ;; undoes the point zipping, back to where lists
+           (coords->where (coords)
+             (list (mapcar #'first coords) (mapcar #'second coords)))
+           )
+    (let* (;; make and select individual where list
+           (where-array-0 (numcl:where array test))
+           (where-array-alt (when array-alt (numcl:where array-alt test)))
+           (where-array-1 (or where-array-alt where-alt)) ;; pick one
+           ;; convert where to coordinate for intersection
+           (array-0-zip (where->coords where-array-0))
+           (array-1-zip (where->coords where-array-1))
+           ;; find shared points
+           (agreement-zipped (intersection array-0-zip array-1-zip :test 'equal))
+           ;; back to where list for return
+           (agreement-where (coords->where agreement-zipped))
+           )
+      agreement-where
+      )))
 
+
+(defun where-aggregate (where-0 where-1)
+  "foldably combines 2 where lists returning their union as a where list "
+  ;; test if where lists are 2D ie. 2 equal length lists
+  (assert (and (= 2 (length where-0))
+               (= (length (first where-0))
+                  (length (second where-0))))
+          () "where-0 must be from a 2D array ie single layered")
+  (assert (and (= 2 (length where-1))
+               (= (length (first where-1))
+                  (length (second where-1))))
+          () "where-1 must be from a 2D array ie single layered")
+
+  (labels (;; convert where lists to 2D points
+           (where->coords (where)
+             (map 'list #'zip (first where) (second where)))
+           ;; makes 1 2D point
+           (zip (a b) (list a b))
+           ;; undoes the point zipping, back to where lists
+           (coords->where (coords)
+             (list (mapcar #'first coords) (mapcar #'second coords)))
+           )
+    (let* (
+           ;; convert where to coordinate for intersection
+           (where-lists (list where-0 where-1))
+           (coordinates (lparallel:pmapcar #'where->coords where-lists))
+           ;; aggregate points
+           (coords-combined (union (first coordinates) (second coordinates) :test 'equal))
+           ;; back to where list for return
+           (where-combined (coords->where coords-combined))
+           )
+      where-combined
+      )))
+
+(defun run-report(experiment &optional show)
+  "opens preps and closes files, calls all test functions in an experiment"
+  (when show (format t "~&~%In: run report"))
+  (labels (
+           ;; python foreign object to internal numcl array
+           (py->array (obj) (simple-array->numcl-array (py:pymethod obj "read" 1)))
+           ;; a function to get wherelists from arrays, which is a closure over nodataval
+           (keep-nodata (nodataval)
+             (lambda (arr)
+               (numcl:where arr #'(lambda (pt)
+                                    (= pt nodataval)))))
+           )
+    (let* (;; real values
+           (tests (gat experiment :tests))
+           (files (gat experiment :files))
+           ;; open files
+           (true-obj (open-geotiff (gat files :true)))
+           (pred-0-obj (open-geotiff (gat files :pred-0)))
+           (pred-1-obj (open-geotiff (gat files :pred-1)))
+           (gpgk-obj (open-geopackage (gat files :gpkg)))
+           (no-data-val (py:pyslot-value true-obj 'nodata))
+           ;; pack into list
+           (python-objects (list true-obj pred-0-obj pred-1-obj))
+           ;; create arrays
+           (check (print "creating arrays"))
+           (arrays (mapcar #'py->array python-objects))
+           ;; ;; close files
+           (true-closed (py:pymethod true-obj 'close))
+           (pred-0-closed (py:pymethod pred-0-obj 'close))
+           (pred-1-closed (py:pymethod pred-1-obj 'close))
+           ;; &&& spoof arrays with captured arrays
+           ;; (arrays (list *captured-true-array* *captured-pred-0-array* *captured-pred-1-array*))
+           ;; mask
+           (check (print "masking nodata"))
+           (masks (lparallel:pmapcar (keep-nodata no-data-val) arrays))
+           (mask-union (lparallel:preduce #'where-aggregate masks))
+           (all-masks (push mask-union masks))
+           (mask-lengths (lparallel:pmapcar (lambda (wl) (length (first wl))) all-masks))
+           ;; &&& vvv
+           ;; &&& recapture some stuff
+           ;; &&& spoof with captured masks
+           ;; (masks (list *captured-true-mask* *captured-pred-0-mask* *captured-pred-1-mask*))
+
+           ;; &&& manipulate arrays
+           ;; &&& D-pred-0
+           ;; &&& D-pred-1
+           ;; &&& categorical manipulations?
+           ;; &&& select where not masked
+           ;; &&&
+           ;; &&& make an arguments plist
+           ;; &&& spoof values
+           ;; (tests '(spoof-test-1))
+           ;; (arguments '(:A1 "hello" :A2 "smol" :A3 "frog"))
+           ;; ;; use the preamble
+           ;; (result-dicts (call-funs-on-args tests arguments experiment))
+           ;; ;; re compose the result-maps
+           ;; (keyed-result-dicts (interleave (mapcar #'symbol->keyword tests)
+           ;;                                 result-dicts))
+           ;; compose the return dict
+           ;; (completed-experiment (sat keyed-result-dicts experiment :results))
+           )
+      ;; (print "check prints")
+      ;; (print keyed-result-dicts)
+      ;; (print completed-experiment)
+      ;; return value
+      mask-lengths
+      ;; completed-experiment
+      )))
 #+X(
-
-    (:TRUE #P"/home/holdens/tempdata/predictions1percent/tiffs/HEIGHT-CM.tiff"
-     :PRED-0 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_HEIGHT-CM_regression_GBM.tiff"
-     :PRED-1 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_HEIGHT-CM_regression_TSAI.tiff"
-     :GPKG #P"/home/holdens/tempdata/predictions1percent/gpkgs/AOI-south.gpkg" :TABLE #P"/home/holdens/tempdata/predictions1percent/tables/temp-table.csv")
-
+    (run-report *test-experiment* t)
+    ;; (defparameter *captured-no-data-val* nil)
+    ;; (defparameter *captured-true-array* nil)
+    ;; (defparameter *captured-pred-0-array* nil)
+    ;; (defparameter *captured-pred-1-array* nil)
+    ;; (defparameter *captured-true-mask* nil)
+    ;; (defparameter *captured-pred-0-mask* nil)
+    ;; (defparameter *captured-pred-1-mask* nil)
     )
 
 (defun run-single-reports (experiments &optional show)
-  "Calls plotting and reporting functions on each experiment, adds the single report stats to each experiment dictionary"
+  "adds the single report stats results to each experiment dictionary"
   (when show (format t "~&~%In: run single reports"))
-  (labels (
-           (run-experiment (experiment)
-             (let* (
-                    ;; real values
-                    (tests (gat experiment :tests))
-                    (files (gat experiment :files))
-                    ;; open files
-                    (true-obj (open-geotiff (gat files :true)))
-                    (pred-0-obj (open-geotiff (gat files :pred-0)))
-                    (pred-1-obj (open-geotiff (gat files :pred-1)))
-                    (gpgk-obj (open-geopackage (gat files :gpkg)))
-                    ;; create arrays
-                    (true (simple-array->numcl-array (py:pymethod true-obj "read" 1)))
-                    (pred-0 (simple-array->numcl-array (py:pymethod pred-0-obj "read" 1)))
-                    (pred-1 (simple-array->numcl-array (py:pymethod pred-1-obj "read" 1)))
-                    ;; &&& manipulate arrays
-                    ;; &&& D-pred-0
-                    ;; &&& D-pred-1
-                    ;; &&&
-                    ;; &&&
-                    ;; &&& make an arguments plist
-                    ;; &&& spoof values
-                    (tests '(spoof-test-1))
-                    (arguments '(:A1 "hello" :A2 "smol" :A3 "frog"))
-                    ;; use the preamble
-                    (result-dicts (call-funs-on-args tests arguments experiment))
-                    ;; close files
-                    (true-closed (py:pymethod true-obj 'close))
-                    (pred-0-closed (py:pymethod pred-0-obj 'close))
-                    (pred-1-closed (py:pymethod pred-1-obj 'close))
-                    ;; re compose the result-maps
-                    (keyed-result-dicts (interleave (mapcar #'symbol->keyword tests)
-                                                    result-dicts))
-                    ;; compose the return dict
-                    (completed-experiment (sat keyed-result-dicts experiment :results))
-                    )
-               ;; (print "check prints")
-               ;; (print keyed-result-dicts)
-               ;; (print completed-experiment)
-               ;; return value
-               completed-experiment
-               ))
-           ;; other label funs
-           )
-    (let* (
-           (completed-experiments (mapcar #'run-experiment experiments))
-           )
+  (let (
+        (completed-experiments (mapcar #'run-report experiments))
+        )
       (when show (format t "~&Returning: ~S" completed-experiments))
       completed-experiments
-      )))
+      ))
 #+X(
     (run-single-reports *test-experiments* t)
     )
@@ -894,64 +1004,44 @@ uses :selected-model to filter files"
 on user input go to next plot or quit")
 
 
-
-(defun where-agree (array test &key array-alt where)
-  (assert (or (and array (not where)) (and (not array) where))() "Use one of array or where")
-  (labels (
-           (where->coords (where)
-             (map 'list #'zip (first where) (second where)))
-           (zip (a b) (list a b))
-           (coords->where (coords)
-             (list (mapcar #'first coords) (mapcar #'second coords)))
-           )
-    (let* (
-           (where-array-0 (numcl:where array test))
-           (where-array-alt (when array-alt (numcl:where array-alt test)))
-           (where-array-1 (or where-array-alt where))
-           ;; where to coordinate for intersection
-           (array-0-zip (where->coords where-array-0))
-           (array-1-zip (where->coords where-array-1))
-           (agreement-zipped (intersection array-0-zip array-1-zip :test 'equal))
-           ;; coordinate to where
-           (agreement-where (coords->where agreement-zipped))
-           )
-      (print where-array-0)
-      (print where-array-1)
-      (print array-0-zip)
-      (print array-1-zip)
-      agreement-where
-      )))
-
-(where-agree *test-array* #'null :array-alt *test-subtr-array*)
-(where-agree *test-array* (complement #'null) :array-alt *test-subtr-array*)
-
-
-
 ;;;; ==================================== scratch
 
 #+X(
-    => (:FILES (:TRUE #P"/home/holdens/tempdata/predictions1percent/tiffs/HEIGHT-CM.tiff" :PRED-0 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_HEIGHT-CM_regression_GBM.tiff" :PRED-1 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_HEIGHT-CM_regression_TSAI.tiff" :GPKG #P"/home/holdens/tempdata/predictions1percent/gpkgs/AOI-south.gpkg" :TABLE #P"/home/holdens/tempdata/predictions1percent/tables/temp-table.csv") :TRAIT ("HEIGHT-CM") :OBJECTIVE ("regression") :MODELS ("GBM" "TSAI") :TESTS (STAT-REG-DESCRIBE-TRUE-HISTO STAT-REG-DESCRIBE-TRUE-MEAN STAT-REG-DESCRIBE-PRED-HISTO STAT-REG-DESCRIBE-PRED-MEAN STAT-REG-COMPARE-PRED-R2 STAT-REG-COMPARE-PRED-RESIDUAL) :META-TESTS (META-STAT-REG-COMPARE-MODELS-ANOVA))
-    )
+    ;; selection after filters &&&
+    (numcl:take *test-array* (where-agree #'(lambda (x) (not (= x -9))) *test-array* :array-alt *test-subtr-array*))
+    (numcl:take *test-subtr-array* (where-agree #'(lambda (x) (not (= x -9))) *test-array* :array-alt *test-subtr-array*))
 
-#+X(
+    ;; filter out -9
+    (where-agree #'(lambda (x) (not (= x -9))) *test-array* :array-alt *test-subtr-array*)
+    (numcl:where *test-subtr-array* #'(lambda (x) (= x -9)))
+    (numcl:where *test-array* #'(lambda (x) (= x -9)))
+
+    ;; filter in out nils
+    (where-agree #'null *test-array* :where-alt '((2) (2)))
+    (where-agree #'null *test-array* :array-alt *test-subtr-array*)
+    (where-agree (complement #'null) *test-array* :array-alt *test-subtr-array*)
 
     (numcl:- *test-array* *test-subtr-array*)
     (numcl:take *test-subtr-array* (numcl:where *test-subtr-array* #'null))
     (numcl:where *test-subtr-array* (complement #'null))
     (numcl:where *test-array* (complement #'null))
 
-    (numcl:take *test-array* '((0 1 2 0 0 1 1 2) (2 1 2 0 1 0 2 2)))
 
     (defparameter *test-subtr-array* (simple-array->numcl-array *test-subtr-array*))
     (defparameter *test-array* (simple-array->numcl-array *test-array*))
 
+    ;; 3x3 1-9 for -9 tests
+    (defparameter *test-subtr-array* (make-array '(3 3) :initial-contents '((-9.0 -9.0 1.0) (1.0 1.0 1.0) (1.0 -9.0 -9.0)) :element-type 'single-float))
+    (defparameter *test-array* (make-array '(3 3) :initial-contents '((-9.0 2.0 3.0) (4.0 5.0 6.0) (7.0 8.0 -9.0)) :element-type 'single-float))
+
+    ;; 3x3 1-9 for nil tests
     (defparameter *test-subtr-array* (make-array '(3 3) :initial-contents
                                                  '((nil nil 1.0) (nil 1.0 nil) (1.0 1.0 nil)) ))
     (defparameter *test-array* (make-array '(3 3) :initial-contents
-                                                 '((1.0 2.0 nil) (4.0 nil 6.0) (7.0 8.0 nil)) ))
+                                           '((1.0 2.0 nil) (4.0 nil 6.0) (7.0 8.0 nil)) ))
 
-    (defparameter *test-subtr-array* (make-array '(3 3) :initial-contents '((1.0 1.0 1.0) (1.0 1.0 1.0) (1.0 1.0 1.0)) :element-type 'single-float))
     ;; 3x3 1-9
+    (defparameter *test-subtr-array* (make-array '(3 3) :initial-contents '((1.0 1.0 1.0) (1.0 1.0 1.0) (1.0 1.0 1.0)) :element-type 'single-float))
     (defparameter *test-array* (make-array '(3 3) :initial-contents '((1.0 2.0 3.0) (4.0 5.0 6.0) (7.0 8.0 9.0)) :element-type 'single-float))
 
     ;; 100x100 all 100
@@ -981,7 +1071,9 @@ on user input go to next plot or quit")
 ;;;;
 
 
-    (defparameter *test-experiments* '((:FILES (:TRUE #P"/home/holdens/tempdata/predictions1percent/tiffs/HEIGHT-CM.tiff" :PRED-0 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_HEIGHT-CM_regression_GBM.tiff" :PRED-1 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_HEIGHT-CM_regression_TSAI.tiff" :GPKG #P"/home/holdens/tempdata/predictions1percent/gpkgs/AOI-south.gpkg" :TABLE #P"/home/holdens/tempdata/predictions1percent/tables/temp-table.csv") :TRAIT ("HEIGHT-CM") :OBJECTIVE ("regression") :MODELS ("GBM" "TSAI") :TESTS (STAT-REG-DESCRIBE-TRUE-HISTO STAT-REG-DESCRIBE-TRUE-MEAN STAT-REG-DESCRIBE-PRED-HISTO STAT-REG-DESCRIBE-PRED-MEAN STAT-REG-COMPARE-PRED-R2 STAT-REG-COMPARE-PRED-RESIDUAL) :META-TESTS (META-STAT-REG-COMPARE-MODELS-ANOVA)) (:FILES (:TRUE #P"/home/holdens/tempdata/predictions1percent/tiffs/BARLEY-WHEAT.tiff" :PRED-0 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_BARLEY-WHEAT_multiclass_GBM.tiff" :PRED-1 #P"/home/holdens/tempdata/predictions1percent/tiffs/PREDICTED_BARLEY-WHEAT_multiclass_TSAI.tiff" :GPKG #P"/home/holdens/tempdata/predictions1percent/gpkgs/AOI-south.gpkg" :TABLE #P"/home/holdens/tempdata/predictions1percent/tables/temp-table.csv") :TRAIT ("BARLEY-WHEAT") :OBJECTIVE ("multiclass") :MODELS ("GBM" "TSAI") :TESTS (STAT-CAT-DESCRIBE-TRUE-BARCHART STAT-CAT-DESCRIBE-PRED-BARCHART STAT-CAT-COMPARE-PRED-F1 STAT-CAT-COMPARE-PRED-CONFUSIONMX) :META-TESTS (META-STAT-CAT-COMPARE-MODELS-ANOVA))))
+
+
+    (defparameter *test-experiments* '((:FILES (:TRUE #P"/home/holdens/tempdata/predictions1percent/input/tiffs/HEIGHT-CM.tiff" :PRED-0 #P"/home/holdens/tempdata/predictions1percent/input/tiffs/PREDICTED_HEIGHT-CM_regression_GBM.tiff" :PRED-1 #P"/home/holdens/tempdata/predictions1percent/input/tiffs/PREDICTED_HEIGHT-CM_regression_TSAI.tiff" :GPKG #P"/home/holdens/tempdata/predictions1percent/input/gpkgs/AOI-south.gpkg" :TABLE #P"/home/holdens/tempdata/predictions1percent/input/tables/temp-table.csv") :TRAIT ("HEIGHT-CM") :OBJECTIVE ("regression") :MODELS ("GBM" "TSAI") :TESTS (STAT-REG-DESCRIBE-TRUE-HISTO STAT-REG-DESCRIBE-TRUE-MEAN STAT-REG-DESCRIBE-PRED-HISTO STAT-REG-DESCRIBE-PRED-MEAN STAT-REG-COMPARE-PRED-R2 STAT-REG-COMPARE-PRED-RESIDUAL) :META-TESTS (META-STAT-REG-COMPARE-MODELS-ANOVA)) (:FILES (:TRUE #P"/home/holdens/tempdata/predictions1percent/input/tiffs/BARLEY-WHEAT.tiff" :PRED-0 #P"/home/holdens/tempdata/predictions1percent/input/tiffs/PREDICTED_BARLEY-WHEAT_multiclass_GBM.tiff" :PRED-1 #P"/home/holdens/tempdata/predictions1percent/input/tiffs/PREDICTED_BARLEY-WHEAT_multiclass_TSAI.tiff" :GPKG #P"/home/holdens/tempdata/predictions1percent/input/gpkgs/AOI-south.gpkg" :TABLE #P"/home/holdens/tempdata/predictions1percent/input/tables/temp-table.csv") :TRAIT ("BARLEY-WHEAT") :OBJECTIVE ("multiclass") :MODELS ("GBM" "TSAI") :TESTS (STAT-CAT-DESCRIBE-TRUE-BARCHART STAT-CAT-DESCRIBE-PRED-BARCHART STAT-CAT-COMPARE-PRED-F1 STAT-CAT-COMPARE-PRED-CONFUSIONMX) :META-TESTS (META-STAT-CAT-COMPARE-MODELS-ANOVA))))
 
     (defparameter *test-experiment* (first *test-experiments*))
 
@@ -1083,7 +1175,7 @@ on user input go to next plot or quit")
     ;; dataset.dtypes
     (py:pyslot-value *dataset-gtif* 'dtypes)
     ;; dataset.nodata
-    (py:pyslot-value *dataset*-gtif 'nodata)
+    (py:pyslot-value *dataset-gtif* 'nodata)
     ;; dataset.shape
     (py:pyslot-value *dataset-gtif* 'shape)
 
