@@ -44,7 +44,7 @@
 ;;;; call validate matrix
 
 ;;;; gpkg->array
-;;;; open gpkg file with geopandas
+;;;; open gpkg file wh geopandas
 ;;;; rasterize identities gpkg with rasterio.features.rasterize
 
 ;;;; gtif->array
@@ -289,7 +289,7 @@
     (validate-files <> show)
     (add-files <> show)
     (validate-geospatial <> show)
-    (coordinate-reports <> show)
+    ;; (coordinate-reports <> show)
     ))
 
 (defun initialize-outputs ()
@@ -713,6 +713,7 @@ funs: a list of symbols which are callable functions, each of which takes the ar
 
 #+X(
     (run-all-reports :show t)
+    (run-all-reports)
     )
 
 ;;;; ==================================== FIN
@@ -883,8 +884,9 @@ uses :selected-model to filter files"
       )))
 
 (defun where-invert (where array)
+  ;; appears to be bad &&&
   "return a wherelist of all positions in the array which are not in the wherelist "
-  (check (print "&&&in where invert creating data mask"))
+  (print "&&&in where invert creating data mask")
   ;; test if where lists are 2D ie. 2 equal length lists
   (assert (and (= 2 (length where))
                (= (length (first where))
@@ -907,19 +909,22 @@ uses :selected-model to filter files"
              (list (mapcar #'first coords) (mapcar #'second coords)))
            )
     (let* (
+           (check (print "&&& convert array"))
            (where-0 (array->allwhere array))
            (where-1 where)
            ;; convert where to coordinate for intersection
            (where-lists (list where-0 where-1))
+           (check (print "&&& make coordinates"))
            (coordinates (lparallel:pmapcar #'where->coords where-lists))
            ;; difference points
+           (check (print "&&& make difference"))
            (coords (set-difference (nth 0 coordinates) (nth 1 coordinates) :test 'equal))
            ;; back to where list for return
+           (check (print "&&& un make coordinates"))
            (where (coords->where coords))
            )
       where
       )))
-
 
 (defun run-report(experiment &optional show)
   "opens preps and closes files, calls all test functions in an experiment"
@@ -938,6 +943,10 @@ uses :selected-model to filter files"
                (numcl:where arr #'(lambda (pt)
                                     (/= pt nodataval)))))
 
+           (all-data (nodataval)
+             (lambda (arr)
+               (numcl:where arr #'(lambda (pt)
+                                    (= pt pt)))))
            )
     (let* (;; real values
            (tests (gat experiment :tests))
@@ -961,22 +970,29 @@ uses :selected-model to filter files"
            ;; (arrays (list *captured-true-array* *captured-pred-0-array* *captured-pred-1-array*))
            ;; mask
            (check (print "creating nodata mask"))
-           (masks (lparallel:pmapcar (keep-nodata no-data-val) arrays))
-           (mask-union (lparallel:preduce #'where-aggregate masks))
+           (masks (lparallel:pmapcar (keep-nodata no-data-val) arrays)) ;; list of wherelists
+           (mask-union (lparallel:preduce #'where-aggregate masks)) ;; single wherelist
+
            (check (print "creating data mask"))
-           (notmask (lparallel:pmapcar (drop-nodata no-data-val) (list (first arrays))))
-           (check (print "creating data mask"))
-           (invert-mask (where-invert mask-union (first arrays)))
+           (notmask (lparallel:pmapcar (drop-nodata no-data-val) (list (first arrays)))) ;list of one wherelist
+
+           ;; &&& is this breaking the run???
+           ;; (check (print "creating data mask"))
+           ;; (invert-mask (where-invert mask-union (first arrays)))
+           ;; &&& replace with all data to test lengths
+           (check (print "creating all data "))
+           (all-data (first (lparallel:pmapcar (all-data no-data-val) (list (first arrays))))) ;single wherelist
+
            ;; combine everything and count
            (check (print "counting mask lengths"))
            (all-masks (push mask-union masks))
-           (all-notmasks (push invert-mask notmask))
+           ;; (all-notmasks (push invert-mask notmask))
+           (all-notmasks (push all-data notmask)) ;; &&& push all datapoints into first place
            (any-masks (append all-notmasks all-masks))
            (mask-lengths (lparallel:pmapcar (lambda (wl) (length (first wl))) any-masks))
-           (print mask-lengths)
+           (check (print mask-lengths))
            ;; &&& vvv
            ;; &&& recapture some stuff
-           ;; open stack to 32gb
            (capture (setf *captured-arrays* arrays))
            (capture (setf *captured-masks* any-masks))
            ;; &&& spoof with captured masks
@@ -1008,22 +1024,50 @@ uses :selected-model to filter files"
       )))
 #+X(
     (run-report *test-experiment* t)
+    )
 
+#+X(
+    ;; work with captures
+
+    ;; reset
     (defparameter *captured-arrays* nil) ; true pred0 pred1
-    (defparameter *captured-masks* nil) ; invert-mask(vs truemask) notmask(vs truemask) mask-union truemask pred0mask pred1mask
-    (length *captured-arrays*)
-    (length *captured-masks*)
+    (defparameter *captured-masks* nil) ; all-data(of truemask) notmask(of truemask) mask-union truemask pred0mask pred1mask
 
+    (time (cl-store:store *captured-arrays* "captured-arrays.lisp"))
+    (time (cl-store:store *captured-masks* "captured-masks.lisp"))
+
+    (setf *captured-arrays* (cl-store:restore "captured-arrays.lisp"))
+    (setf *captured-masks* (cl-store:restore "captured-masks.lisp"))
+
+    (length *captured-arrays*) ; 3
+    (length *captured-masks*) ; 6
+
+    ;; unpack
     (defparameter *captured-true-array* (first *captured-arrays*))
     (defparameter *captured-pred-0-array* (second *captured-arrays*))
     (defparameter *captured-pred-1-array* (third *captured-arrays*))
-
-    (defparameter *captured-invert-mask* (first *captured-masks*))
+    ;; (defparameter *captured-invert-mask* (first *captured-masks*))
+    (defparameter *captured-all-data* (first *captured-masks*)) ; &&& temp for subtractions
     (defparameter *captured-not-mask* (second *captured-masks*))
+    (defparameter *captured-union-mask* (third *captured-masks*))
     (defparameter *captured-true-mask* (fourth *captured-masks*))
     (defparameter *captured-pred-0-mask* (fifth *captured-masks*))
     (defparameter *captured-pred-1-mask* (sixth *captured-masks*))
+
+    ;; length extraction
+    (let* (
+           (mask-lengths (lparallel:pmapcar (lambda (wl) (length (first wl))) *captured-masks*))
+           (all (first mask-lengths))
+           (not (second mask-lengths))
+           (union (third mask-lengths))
+           (masked-via-diff (- all not))
+           (err (- masked-via-diff union))
+           )
+      (format t "error: ~A" err)
+      (assert (= err 0) () "expected error to be 0 found ~A" err )
+      )
     )
+
 
 
 
@@ -1132,11 +1176,7 @@ on user input go to next plot or quit")
     ;; placeholder for plot from html function
     (plot:plot-from-file *test-plot-filename* :browser :firefox)
 
-
-
 ;;;;
-
-
 
 
     (defparameter *test-experiments* '((:FILES (:TRUE #P"/home/holdens/tempdata/predictions1percent/input/tiffs/HEIGHT-CM.tiff" :PRED-0 #P"/home/holdens/tempdata/predictions1percent/input/tiffs/PREDICTED_HEIGHT-CM_regression_GBM.tiff" :PRED-1 #P"/home/holdens/tempdata/predictions1percent/input/tiffs/PREDICTED_HEIGHT-CM_regression_TSAI.tiff" :GPKG #P"/home/holdens/tempdata/predictions1percent/input/gpkgs/AOI-south.gpkg" :TABLE #P"/home/holdens/tempdata/predictions1percent/input/tables/temp-table.csv") :TRAIT ("HEIGHT-CM") :OBJECTIVE ("regression") :MODELS ("GBM" "TSAI") :TESTS (STAT-REG-DESCRIBE-TRUE-HISTO STAT-REG-DESCRIBE-TRUE-MEAN STAT-REG-DESCRIBE-PRED-HISTO STAT-REG-DESCRIBE-PRED-MEAN STAT-REG-COMPARE-PRED-R2 STAT-REG-COMPARE-PRED-RESIDUAL) :META-TESTS (META-STAT-REG-COMPARE-MODELS-ANOVA)) (:FILES (:TRUE #P"/home/holdens/tempdata/predictions1percent/input/tiffs/BARLEY-WHEAT.tiff" :PRED-0 #P"/home/holdens/tempdata/predictions1percent/input/tiffs/PREDICTED_BARLEY-WHEAT_multiclass_GBM.tiff" :PRED-1 #P"/home/holdens/tempdata/predictions1percent/input/tiffs/PREDICTED_BARLEY-WHEAT_multiclass_TSAI.tiff" :GPKG #P"/home/holdens/tempdata/predictions1percent/input/gpkgs/AOI-south.gpkg" :TABLE #P"/home/holdens/tempdata/predictions1percent/input/tables/temp-table.csv") :TRAIT ("BARLEY-WHEAT") :OBJECTIVE ("multiclass") :MODELS ("GBM" "TSAI") :TESTS (STAT-CAT-DESCRIBE-TRUE-BARCHART STAT-CAT-DESCRIBE-PRED-BARCHART STAT-CAT-COMPARE-PRED-F1 STAT-CAT-COMPARE-PRED-CONFUSIONMX) :META-TESTS (META-STAT-CAT-COMPARE-MODELS-ANOVA))))
