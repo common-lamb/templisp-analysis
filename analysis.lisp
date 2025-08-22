@@ -883,49 +883,6 @@ uses :selected-model to filter files"
       where-combined
       )))
 
-(defun where-invert (where array)
-  ;; appears to be bad &&&
-  "return a wherelist of all positions in the array which are not in the wherelist "
-  (print "&&&in where invert creating data mask")
-  ;; test if where lists are 2D ie. 2 equal length lists
-  (assert (and (= 2 (length where))
-               (= (length (first where))
-                  (length (second where))))
-          () "where must be from a 2D array ie single layered")
-  ;; test if array is 2D
-  (assert (= 2 (length (array-dimensions array)))
-          () "array must be 2D ie. single layered" )
-
-  (labels (
-           (array->allwhere (array) (numcl:where array #'pt-always-t))
-           (pt-always-t (pt) (= pt pt))
-           ;; convert where lists to 2D points
-           (where->coords (where)
-             (map 'list #'zip (first where) (second where)))
-           ;; makes 1 2D point
-           (zip (a b) (list a b))
-           ;; undoes the point zipping, back to where lists
-           (coords->where (coords)
-             (list (mapcar #'first coords) (mapcar #'second coords)))
-           )
-    (let* (
-           (check (print "&&& convert array"))
-           (where-0 (array->allwhere array))
-           (where-1 where)
-           ;; convert where to coordinate for intersection
-           (where-lists (list where-0 where-1))
-           (check (print "&&& make coordinates"))
-           (coordinates (lparallel:pmapcar #'where->coords where-lists))
-           ;; difference points
-           (check (print "&&& make difference"))
-           (coords (set-difference (nth 0 coordinates) (nth 1 coordinates) :test 'equal))
-           ;; back to where list for return
-           (check (print "&&& un make coordinates"))
-           (where (coords->where coords))
-           )
-      where
-      )))
-
 (defun run-report(experiment &optional show)
   "opens preps and closes files, calls all test functions in an experiment"
   (when show (format t "~&~%In: run report"))
@@ -943,66 +900,79 @@ uses :selected-model to filter files"
                (numcl:where arr #'(lambda (pt)
                                     (/= pt nodataval)))))
 
-           (all-data (nodataval)
+           (count-alldata (nodataval)
              (lambda (arr)
                (numcl:where arr #'(lambda (pt)
                                     (= pt pt)))))
            )
-    (let* (;; real values
-           (tests (gat experiment :tests))
-           (files (gat experiment :files))
-           ;; open files
-           (true-obj (open-geotiff (gat files :true)))
-           (pred-0-obj (open-geotiff (gat files :pred-0)))
-           (pred-1-obj (open-geotiff (gat files :pred-1)))
-           (gpgk-obj (open-geopackage (gat files :gpkg)))
-           (no-data-val (py:pyslot-value true-obj 'nodata))
-           ;; pack into list
-           (python-objects (list true-obj pred-0-obj pred-1-obj))
-           ;; create arrays
-           (check (print "creating arrays"))
-           (arrays (lparallel:pmapcar #'py->array python-objects))
-           ;; close files
-           (true-closed (py:pymethod true-obj 'close))
-           (pred-0-closed (py:pymethod pred-0-obj 'close))
-           (pred-1-closed (py:pymethod pred-1-obj 'close))
+    (let* (
+
            ;; &&& spoof arrays with captured arrays
-           ;; (arrays (list *captured-true-array* *captured-pred-0-array* *captured-pred-1-array*))
-           ;; mask
-           (check (print "creating nodata mask"))
-           (masks (lparallel:pmapcar (keep-nodata no-data-val) arrays)) ;; list of wherelists
-           (mask-union (lparallel:preduce #'where-aggregate masks)) ;; single wherelist
+           (arrays *captured-arrays*)
+           ;; spoof masks with captured masks
+           (any-masks *captured-masks*)
 
-           (check (print "creating data mask"))
-           (notmask (lparallel:pmapcar (drop-nodata no-data-val) (list (first arrays)))) ;list of one wherelist
+           ;; ;; real values
+           ;; (tests (gat experiment :tests))
+           ;; (files (gat experiment :files))
+           ;; ;; open files
+           ;; (true-obj (open-geotiff (gat files :true)))
+           ;; (pred-0-obj (open-geotiff (gat files :pred-0)))
+           ;; (pred-1-obj (open-geotiff (gat files :pred-1)))
+           ;; (python-objects (list true-obj pred-0-obj pred-1-obj))
+           ;; aux values
+           ;; (no-data-val (py:pyslot-value true-obj 'nodata))
+           ;; (gpgk-obj (open-geopackage (gat files :gpkg))) ; &&& use me
+           ;; ;; create arrays
+           ;; (check (print "creating arrays"))
+           ;; (arrays (lparallel:pmapcar #'py->array python-objects))
+           ;; ;; close files
+           ;; (true-closed (py:pymethod true-obj 'close))
+           ;; (pred-0-closed (py:pymethod pred-0-obj 'close))
+           ;; (pred-1-closed (py:pymethod pred-1-obj 'close))
 
-           ;; &&& is this breaking the run???
+           ;; ;; mask
+           ;; (check (print "creating nodata mask"))
+           ;; (masks (lparallel:pmapcar (keep-nodata no-data-val) arrays)) ;; list of wherelists
+           ;; (mask-union (lparallel:preduce #'where-aggregate masks)) ;; single wherelist
            ;; (check (print "creating data mask"))
-           ;; (invert-mask (where-invert mask-union (first arrays)))
-           ;; &&& replace with all data to test lengths
-           (check (print "creating all data "))
-           (all-data (first (lparallel:pmapcar (all-data no-data-val) (list (first arrays))))) ;single wherelist
+           ;; (not-mask (lparallel:pmapcar (drop-nodata no-data-val) (list (first arrays)))) ;list of one wherelist
+           ;; ;; calculate all raster data to test lengths
+           ;; (check (print "creating all data "))
+           ;; (all-data (first (lparallel:pmapcar (count-alldata no-data-val) (list (first arrays))))) ;single wherelist
+           ;; ;; combine everything
+           ;; (all-masks (push mask-union masks))
+           ;; (all-nonmasks (push all-data not-mask))
+           ;; (any-masks (append all-nonmasks all-masks))
 
-           ;; combine everything and count
+           ;; &&& capture expensive data
+           ;; (capture (setf *captured-arrays* arrays)) ; true pred0 pred1
+           ;; (capture (setf *captured-masks* any-masks)) ; all-data(of truemask) not-mask(of truemask) mask-union truemask pred0mask pred1mask
+
+           ;; length checking for mask extent validation
            (check (print "counting mask lengths"))
-           (all-masks (push mask-union masks))
-           ;; (all-notmasks (push invert-mask notmask))
-           (all-notmasks (push all-data notmask)) ;; &&& push all datapoints into first place
-           (any-masks (append all-notmasks all-masks))
            (mask-lengths (lparallel:pmapcar (lambda (wl) (length (first wl))) any-masks))
-           (check (print mask-lengths))
+           (mask-error (- ; difference between anti-data and masks-union
+                                        ; all-data - data = anti-data
+                        (- (first mask-lengths) (second mask-lengths))
+                                        ; union of masks = largest extent of non-data
+                        (third mask-lengths)))
+           (check (format t "~&mask lengths (all-data(mask+data of truemask) not-mask(data of truemask) mask-union truemask pred0mask pred1mask): ~S" mask-lengths))
+           (check (assert (= 0 mask-error) () "masks are not in agreement"))
            ;; &&& vvv
-           ;; &&& recapture some stuff
-           (capture (setf *captured-arrays* arrays))
-           (capture (setf *captured-masks* any-masks))
-           ;; &&& spoof with captured masks
-           ;; (masks (list *captured-true-mask* *captured-pred-0-mask* *captured-pred-1-mask*))
-           ;; &&& manipulate arrays
-           ;; &&& D-pred-0
-           ;; &&& D-pred-1
-           ;; &&& categorical manipulations?
+           ;; manipulate arrays
+           (true-array (first arrays))
+           (pred-0-array (second arrays))
+           (pred-1-array (third arrays))
+           (not-mask (second any-masks))
+           ;; regression manipulations
+           (delta-0-array (numcl:- pred-0-array true-array))
+           (delta-1-array (numcl:- pred-1-array true-array))
+           ;; &&& categorical manipulations
+           ;; &&& aggregated manipulations
            ;; &&& select where not masked
-           ;; &&&
+           (delta-0-data (numcl:take delta-0-array not-mask))
+           (delta-1-data (numcl:take delta-1-array not-mask))
            ;; &&& make an arguments plist
            ;; &&& spoof values
            ;; (tests '(spoof-test-1))
@@ -1019,7 +989,7 @@ uses :selected-model to filter files"
       ;; (print keyed-result-dicts)
       ;; (print completed-experiment)
       ;; return value
-      mask-lengths
+      mask-error
       ;; completed-experiment
       )))
 #+X(
@@ -1030,13 +1000,14 @@ uses :selected-model to filter files"
     ;; work with captures
 
     ;; reset
-    (defparameter *captured-arrays* nil) ; true pred0 pred1
-    (defparameter *captured-masks* nil) ; all-data(of truemask) notmask(of truemask) mask-union truemask pred0mask pred1mask
+    ;; (defparameter *captured-arrays* nil) ; true pred0 pred1
+    ;; (defparameter *captured-masks* nil) ; all-data(of truemask) notmask(of truemask) mask-union truemask pred0mask pred1mask
+    ;; ;; store after run
+    ;; (cl-store:store *captured-arrays* "captured-arrays.lisp")
+    ;; (cl-store:store *captured-masks* "captured-masks.lisp")
 
-    (time (cl-store:store *captured-arrays* "captured-arrays.lisp"))
-    (time (cl-store:store *captured-masks* "captured-masks.lisp"))
-
-    (setf *captured-arrays* (cl-store:restore "captured-arrays.lisp"))
+    ;; reload
+    (setf  *captured-arrays* (cl-store:restore "captured-arrays.lisp"))
     (setf *captured-masks* (cl-store:restore "captured-masks.lisp"))
 
     (length *captured-arrays*) ; 3
@@ -1054,20 +1025,15 @@ uses :selected-model to filter files"
     (defparameter *captured-pred-0-mask* (fifth *captured-masks*))
     (defparameter *captured-pred-1-mask* (sixth *captured-masks*))
 
-    ;; length extraction
-    (let* (
-           (mask-lengths (lparallel:pmapcar (lambda (wl) (length (first wl))) *captured-masks*))
-           (all (first mask-lengths))
-           (not (second mask-lengths))
-           (union (third mask-lengths))
-           (masked-via-diff (- all not))
-           (err (- masked-via-diff union))
-           )
-      (format t "error: ~A" err)
-      (assert (= err 0) () "expected error to be 0 found ~A" err )
-      )
-    )
+    (defparameter *test* (numcl:- *captured-pred-0-array* *captured-true-array*))
+    (defparameter *test-take* (numcl:take *test* *captured-not-mask*))
+    (length *test-take*)
+    (lisp-stat:mean *test-take*)
 
+
+
+
+    ) ;; end X
 
 
 
